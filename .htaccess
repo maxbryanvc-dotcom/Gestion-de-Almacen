@@ -1,0 +1,25 @@
+# ============================================================
+# SEGURIDAD — ERP Almacén
+# ============================================================
+
+# 1. Desactivar listado de carpetas
+Options -Indexes
+
+# 2. Si alguien entra a una carpeta directamente → redirigir al login
+DirectoryIndex index.php
+
+# 3. Bloquear acceso directo a carpetas internas
+RedirectMatch 403 ^/Gestion-de-almacen/(pages|includes|config|api|exports|uploads)/$
+
+# 4. Proteger archivos sensibles
+<FilesMatch "\.(sql|log|env|json|lock|md)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# 5. Proteger carpeta includes (nadie accede directo)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^includes/ - [F,L]
+    RewriteRule ^config/   - [F,L]
+</IfModule>

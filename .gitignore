@@ -1,0 +1,30 @@
+# ============================================================
+# GITIGNORE — ERP Gestión de Almacén
+# ============================================================
+
+# Dependencias de Composer (se instalan con: composer install)
+/vendor/
+
+# Archivos de configuración local sensibles
+*.env
+*.log
+
+# Archivos temporales del sistema
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Archivos de sesión PHP
+/tmp/
+
+# Carpeta de uploads (archivos subidos por usuarios)
+/uploads/*
+!/uploads/.gitkeep
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+
+# Carpeta interna de Claude
+.claude/
