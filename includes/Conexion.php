@@ -6,8 +6,8 @@
 
 // Docker usa variables de entorno; XAMPP usa valores por defecto
 $host = getenv('DB_HOST') ?: 'localhost';
-$user = getenv('DB_USER') ?: 'root';
-$pass = getenv('DB_PASS') ?: '';
+$user = getenv('DB_USER') ?: 'maxBryan';
+$pass = getenv('DB_PASS') ?: '1996max2307';
 $db   = getenv('DB_NAME') ?: 'almacen_sistema';
 
 $conn = new mysqli($host, $user, $pass, $db);
