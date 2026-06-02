@@ -1,7 +1,7 @@
 ﻿<?php
 // ============================================================
-// CONEXIÓN A BASE DE DATOS
-// Compatible con XAMPP (local) y Docker automáticamente
+// CONEXION A BASE DE DATOS
+// Compatible con XAMPP (local) y Docker automaticamente
 // ============================================================
 
 // Docker usa variables de entorno; XAMPP usa valores por defecto
@@ -14,10 +14,7 @@ $conn = new mysqli($host, $user, $pass, $db);
 
 if ($conn->connect_error) {
     error_log("DB Error: " . $conn->connect_error);
-    die("Error de conexión. Contacte al administrador.");
+    die("Error de conexion. Contacte al administrador.");
 }
 
 $conn->set_charset("utf8mb4");
-
-// Alias en minúsculas para compatibilidad con includes que usan "conexion.php"
-// (PHP en Windows no distingue mayúsculas en includes, pero por claridad se mantiene)

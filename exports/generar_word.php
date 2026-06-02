@@ -296,14 +296,20 @@ function cellStyle(string $bg = 'FFFFFF', string $border = '4472C4'): array {
 ob_end_clean();
 
 $filename = 'CartaPedido_' . preg_replace('/[^A-Za-z0-9\-]/', '', $numeroCarta) . '_' . date('Ymd') . '.docx';
+$tmpFile  = tempnam(sys_get_temp_dir(), 'word_') . '.docx';
 
+$writer = IOFactory::createWriter($phpWord, 'Word2007');
+$writer->save($tmpFile);
+
+audit_log($conn, 'GENERAR_WORD', "Carta pedido requerimiento ID $id");
+
+while (ob_get_level()) ob_end_clean();
 header('Content-Description: File Transfer');
 header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
+header('Content-Length: ' . filesize($tmpFile));
 header('Cache-Control: max-age=0');
 
-$writer = IOFactory::createWriter($phpWord, 'Word2007');
-$writer->save('php://output');
-
-audit_log($conn, 'GENERAR_WORD', "Carta pedido requerimiento ID $id");
+readfile($tmpFile);
+unlink($tmpFile);
 exit;

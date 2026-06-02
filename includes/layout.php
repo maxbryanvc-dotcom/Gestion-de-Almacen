@@ -289,6 +289,206 @@ function menuActivo(string $pagina): string {
             .main-content { padding:14px; }
             .topbar { border-radius:12px; }
         }
+
+        /* ==================== MEJORAS VISUALES ==================== */
+
+        /* 1. Scrollbar del sidebar */
+        .sidebar::-webkit-scrollbar { width:4px; }
+        .sidebar::-webkit-scrollbar-track { background:transparent; }
+        .sidebar::-webkit-scrollbar-thumb { background:#334155; border-radius:10px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background:#475569; }
+
+        /* 2. Enlace activo con barra lateral izquierda */
+        .sidebar-link.active {
+            background:linear-gradient(135deg,rgba(59,130,246,0.18),rgba(99,102,241,0.12));
+            color:#93c5fd;
+            border:1px solid rgba(59,130,246,0.25);
+            box-shadow:0 2px 8px rgba(59,130,246,0.1);
+            position:relative;
+        }
+        .sidebar-link.active::before {
+            content:'';
+            position:absolute;
+            left:0; top:20%; bottom:20%;
+            width:3px;
+            background:linear-gradient(180deg,#3b82f6,#6366f1);
+            border-radius:0 4px 4px 0;
+        }
+        .sidebar-link.active i { color:#60a5fa; }
+        .sidebar-link:hover {
+            background:rgba(255,255,255,0.07);
+            color:#e2e8f0;
+            transform:translateX(2px);
+        }
+
+        /* 3. Cards con acento de color en borde superior */
+        .card-dashboard {
+            background:linear-gradient(160deg,#1a2744 0%,#0f172a 100%);
+            border:1px solid rgba(255,255,255,0.06);
+            border-radius:20px; padding:24px;
+            box-shadow:0 4px 24px rgba(0,0,0,0.25);
+            transition:transform 0.25s ease, box-shadow 0.25s ease;
+            position:relative; overflow:hidden;
+        }
+        .card-dashboard::after {
+            content:'';
+            position:absolute;
+            top:0; left:0; right:0;
+            height:2px;
+            background:linear-gradient(90deg,#3b82f6,#6366f1,#8b5cf6);
+            border-radius:20px 20px 0 0;
+            opacity:0.6;
+        }
+        .card-dashboard:hover {
+            transform:translateY(-3px);
+            box-shadow:0 12px 36px rgba(0,0,0,0.35);
+        }
+        .card-dashboard:hover::after { opacity:1; }
+        body.light-mode .card-dashboard {
+            background:white; color:#0f172a;
+            box-shadow:0 4px 16px rgba(0,0,0,0.07);
+            border-color:#e2e8f0;
+        }
+
+        /* 4. Cabeceras de tabla mejoradas */
+        .table thead tr th {
+            background:linear-gradient(135deg,#1e293b,#0f172a);
+            color:#94a3b8;
+            font-size:11px;
+            font-weight:700;
+            text-transform:uppercase;
+            letter-spacing:0.06em;
+            padding:14px 12px;
+            border-bottom:2px solid rgba(59,130,246,0.3) !important;
+            border-top:none !important;
+        }
+        .table tbody td {
+            padding:12px;
+            border-color:rgba(255,255,255,0.04) !important;
+            vertical-align:middle;
+        }
+        body.light-mode .table thead tr th {
+            background:#f8fafc; color:#475569;
+            border-bottom:2px solid #e2e8f0 !important;
+        }
+        body.light-mode .table tbody td {
+            border-color:#f1f5f9 !important;
+        }
+
+        /* 5. Botones con gradiente y sombra */
+        .btn-primary {
+            background:linear-gradient(135deg,#3b82f6,#6366f1) !important;
+            border:none !important;
+            box-shadow:0 4px 12px rgba(59,130,246,0.3);
+            transition:all 0.2s !important;
+        }
+        .btn-primary:hover {
+            background:linear-gradient(135deg,#2563eb,#4f46e5) !important;
+            box-shadow:0 6px 20px rgba(59,130,246,0.45) !important;
+            transform:translateY(-1px);
+        }
+        .btn-success {
+            background:linear-gradient(135deg,#22c55e,#16a34a) !important;
+            border:none !important;
+            box-shadow:0 4px 12px rgba(34,197,94,0.25);
+            transition:all 0.2s !important;
+        }
+        .btn-success:hover {
+            box-shadow:0 6px 20px rgba(34,197,94,0.4) !important;
+            transform:translateY(-1px);
+        }
+        .btn-danger {
+            background:linear-gradient(135deg,#ef4444,#dc2626) !important;
+            border:none !important;
+            box-shadow:0 4px 12px rgba(239,68,68,0.25);
+            transition:all 0.2s !important;
+        }
+        .btn-danger:hover {
+            box-shadow:0 6px 20px rgba(239,68,68,0.4) !important;
+            transform:translateY(-1px);
+        }
+        .btn-warning {
+            background:linear-gradient(135deg,#f59e0b,#d97706) !important;
+            border:none !important;
+            box-shadow:0 4px 12px rgba(245,158,11,0.25);
+            transition:all 0.2s !important;
+        }
+        .btn-warning:hover {
+            box-shadow:0 6px 20px rgba(245,158,11,0.4) !important;
+            transform:translateY(-1px);
+        }
+
+        /* 6. Inputs con glow al enfocar */
+        .form-control:focus, .form-select:focus {
+            background:#1e293b !important;
+            border-color:#3b82f6 !important;
+            color:white !important;
+            box-shadow:0 0 0 3px rgba(59,130,246,0.15) !important;
+        }
+        body.light-mode .form-control:focus,
+        body.light-mode .form-select:focus {
+            background:white !important;
+            color:#0f172a !important;
+            box-shadow:0 0 0 3px rgba(59,130,246,0.12) !important;
+        }
+
+        /* 7. Animación fade-in de página */
+        .main-content { animation:fadeInPage 0.35s ease; }
+        @keyframes fadeInPage {
+            from { opacity:0; transform:translateY(6px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+
+        /* Badges más pulidos */
+        .badge {
+            font-weight:600;
+            letter-spacing:0.02em;
+            padding:5px 10px;
+            border-radius:8px;
+        }
+
+        /* Secciones del sidebar con línea decorativa */
+        .sidebar-section-title {
+            display:flex; align-items:center; gap:8px;
+        }
+        .sidebar-section-title::after {
+            content:'';
+            flex:1;
+            height:1px;
+            background:rgba(255,255,255,0.05);
+        }
+
+        /* Logo con brillo al hover */
+        .logo-icon-sq {
+            transition:0.3s;
+            box-shadow:0 4px 12px rgba(59,130,246,0.3);
+        }
+        .sidebar-logo:hover .logo-icon-sq {
+            box-shadow:0 6px 20px rgba(59,130,246,0.5);
+            transform:scale(1.05);
+        }
+
+        /* Topbar mejorado */
+        .topbar {
+            background:linear-gradient(135deg,#141e2e,#111827);
+            border:1px solid rgba(255,255,255,0.05);
+            box-shadow:0 4px 20px rgba(0,0,0,0.25);
+        }
+
+        /* Avatar de usuario con brillo */
+        .user-avatar {
+            box-shadow:0 0 0 2px rgba(16,185,129,0.3);
+            transition:0.3s;
+        }
+        .sidebar-user:hover .user-avatar {
+            box-shadow:0 0 0 3px rgba(16,185,129,0.5);
+        }
+
+        /* Scrollbar global */
+        ::-webkit-scrollbar { width:6px; height:6px; }
+        ::-webkit-scrollbar-track { background:rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background:#334155; border-radius:10px; }
+        ::-webkit-scrollbar-thumb:hover { background:#475569; }
     </style>
 </head>
 <body>
@@ -343,12 +543,12 @@ function menuActivo(string $pagina): string {
         </a>
 
         <a href="<?= BASE_URL ?>/pages/entrada_material.php" class="sidebar-link <?= menuActivo('entrada_material.php') ?>">
-            <i class="fa-solid fa-arrow-down-to-line"></i>
+            <i class="fa-solid fa-download"></i>
             <span class="sidebar-label">Entradas</span>
         </a>
 
         <a href="<?= BASE_URL ?>/pages/salida_material.php" class="sidebar-link <?= menuActivo('salida_material.php') ?>">
-            <i class="fa-solid fa-arrow-up-from-line"></i>
+            <i class="fa-solid fa-upload"></i>
             <span class="sidebar-label">Salidas</span>
         </a>
 
@@ -390,6 +590,25 @@ function menuActivo(string $pagina): string {
             <span class="sidebar-label">Liquidación</span>
         </a>
 
+        <?php
+        // ============================================================
+        // MÓDULO PLANTILLAS DINÁMICAS — actualmente desactivado del menú
+        // Para activar: quita el bloque de comentario /* */ de abajo
+        // Archivo: pages/plantillas.php
+        // ============================================================
+        /*
+        ?>
+        <!-- CONFIGURACIÓN -->
+        <div class="sidebar-section-title">Configuración</div>
+
+        <a href="<?= BASE_URL ?>/pages/plantillas.php" class="sidebar-link <?= menuActivo('plantillas.php') ?>">
+            <i class="fa-solid fa-file-contract"></i>
+            <span class="sidebar-label">Plantillas</span>
+        </a>
+        <?php
+        */
+        ?>
+
         <!-- ADMINISTRACIÓN — solo admin y almacen -->
         <?php if (in_array($rolActual, ['admin','almacen'])): ?>
         <div class="sidebar-section-title">Exportación</div>
@@ -430,10 +649,34 @@ function menuActivo(string $pagina): string {
             <button class="btn-icon" onclick="toggleSidebar()" title="Colapsar menú">
                 <i class="fa-solid fa-bars"></i>
             </button>
-            <!-- Breadcrumb / Título de página -->
-            <span style="font-size:14px; color:#64748b;">
-                <?= APP_NAME ?>
-            </span>
+            <!-- Breadcrumb con página actual -->
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;color:#475569;"><?= APP_NAME ?></span>
+                <span style="color:#334155;font-size:12px;">/</span>
+                <span style="font-size:13px;color:#94a3b8;font-weight:500;">
+                    <?php
+                    $nombres = [
+                        'dashboard.php'          => 'Dashboard',
+                        'materiales.php'         => 'Materiales',
+                        'entrada_material.php'   => 'Entradas',
+                        'salida_material.php'    => 'Salidas',
+                        'reingreso_material.php' => 'Reingresos',
+                        'requerimiento.php'      => 'Requerimientos',
+                        'ordenes_trabajo.php'    => 'Órdenes de Trabajo',
+                        'tecnicos.php'           => 'Técnicos',
+                        'historial.php'          => 'Historial',
+                        'kardex.php'             => 'Kardex',
+                        'liquidacion.php'        => 'Liquidación',
+                        'usuarios.php'           => 'Usuarios',
+                        'plantillas.php'         => 'Plantillas',
+                        'agregar_material.php'   => 'Agregar Material',
+                        'editar_material.php'    => 'Editar Material',
+                        'ver_requerimiento.php'  => 'Ver Requerimiento',
+                    ];
+                    echo $nombres[$paginaActual] ?? ucfirst(str_replace(['.php','_'], ['', ' '], $paginaActual));
+                    ?>
+                </span>
+            </div>
         </div>
 
         <div class="topbar-right">

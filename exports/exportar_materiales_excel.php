@@ -2,12 +2,16 @@
 // ============================================================
 // EXPORTAR MATERIALES A EXCEL (.xlsx) via PhpSpreadsheet
 // ============================================================
+ob_start();                    // captura cualquier salida accidental
+error_reporting(0);            // silencia warnings que corrompen el archivo
+ini_set('display_errors', 0);
+
 require_once __DIR__ . '/../includes/Conexion.php';
 require_once __DIR__ . '/../includes/auth.php';
 verificarRol(['admin', 'almacen']);
 
-// Verificar que PhpSpreadsheet esté instalado
-$spreadsheetPath = __DIR__ . '/vendor/autoload.php';
+// Cargar autoload de Composer (vendor está en la raíz del proyecto)
+$spreadsheetPath = __DIR__ . '/../vendor/autoload.php';
 if (!file_exists($spreadsheetPath)) {
     die('PhpSpreadsheet no instalado. Ejecuta: composer require phpoffice/phpspreadsheet');
 }
@@ -156,15 +160,22 @@ $sheet2->getStyle('A2:F2')->applyFromArray([
     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '334155']],
 ]);
 
-// Entradas
+// Detectar columnas opcionales
+$colE = array_column($conn->query("SHOW COLUMNS FROM entradas")->fetch_all(MYSQLI_ASSOC),'Field');
+$colS = array_column($conn->query("SHOW COLUMNS FROM salidas")->fetch_all(MYSQLI_ASSOC),'Field');
+$colR = array_column($conn->query("SHOW COLUMNS FROM reingresos")->fetch_all(MYSQLI_ASSOC),'Field');
+$uE = in_array('usuario',$colE) ? "COALESCE(e.usuario,'')" : "''";
+$uS = in_array('usuario',$colS) ? "COALESCE(s.usuario,'')" : "''";
+$uR = in_array('registrado_por',$colR) ? "r.registrado_por" : "''";
+
 $movs = $conn->query("
-    SELECT e.fecha, 'ENTRADA' tipo, m.nombre material, e.cantidad, '—' tecnico, COALESCE(e.usuario,'') usu
+    SELECT e.fecha, 'ENTRADA' tipo, m.nombre material, e.cantidad, '—' tecnico, $uE usu
     FROM entradas e JOIN materiales m ON m.id=e.material_id
     UNION ALL
-    SELECT s.fecha, 'SALIDA', m.nombre, s.cantidad, COALESCE(t.nombre,'—'), COALESCE(s.usuario,'')
+    SELECT s.fecha, 'SALIDA', m.nombre, s.cantidad, COALESCE(t.nombre,'—'), $uS
     FROM salidas s JOIN materiales m ON m.id=s.material_id LEFT JOIN tecnicos t ON t.id=s.tecnico_id
     UNION ALL
-    SELECT r.fecha, 'REINGRESO', m.nombre, r.cantidad, COALESCE(t.nombre,'—'), r.registrado_por
+    SELECT r.fecha, 'REINGRESO', m.nombre, r.cantidad, COALESCE(t.nombre,'—'), $uR
     FROM reingresos r JOIN materiales m ON m.id=r.material_id LEFT JOIN tecnicos t ON t.id=r.tecnico_id
     ORDER BY fecha DESC LIMIT 100
 ");
@@ -187,15 +198,24 @@ while ($mv = $movs->fetch_assoc()) {
 $spreadsheet->setActiveSheetIndex(0);
 
 // ============================================================
-// ENVIAR ARCHIVO
+// ENVIAR ARCHIVO — guardar en temp y enviar limpio
 // ============================================================
 $filename = 'Inventario_' . date('Ymd_His') . '.xlsx';
+$tmpFile  = tempnam(sys_get_temp_dir(), 'excel_') . '.xlsx';
+
+// Guardar en archivo temporal (evita contaminación con warnings PHP)
+(new Xlsx($spreadsheet))->save($tmpFile);
+
+// Limpiar cualquier salida acumulada y enviar el archivo limpio
+while (ob_get_level()) ob_end_clean();
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
+header('Content-Length: ' . filesize($tmpFile));
 header('Cache-Control: max-age=0');
 
-(new Xlsx($spreadsheet))->save('php://output');
+readfile($tmpFile);
+unlink($tmpFile);   // borrar archivo temporal
 
-audit_log($conn, 'EXPORT_EXCEL', "Exportación de inventario a Excel");
+audit_log($conn, 'EXPORT_EXCEL', "Exportacion de inventario a Excel");
 exit();
