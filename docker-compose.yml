@@ -1,0 +1,81 @@
+# ============================================================
+# SIGMA ERP — Docker Compose
+# Levanta: PHP+Apache + MySQL + phpMyAdmin
+# Uso: docker-compose up -d
+# ============================================================
+
+version: '3.8'
+
+services:
+
+  # ── Aplicación PHP + Apache ─────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sigma_erp_app
+    restart: unless-stopped
+    ports:
+      - "80:80"           # http://localhost
+    volumes:
+      - .:/var/www/html   # monta tu código (cambios en vivo)
+      - uploads_data:/var/www/html/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-almacen_sistema}
+      - DB_USER=${DB_USER:-sigma_user}
+      - DB_PASS=${DB_PASS:-sigma2026}
+    networks:
+      - sigma_network
+
+  # ── Base de datos MySQL ──────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: sigma_erp_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-root2026}
+      MYSQL_DATABASE: ${DB_NAME:-almacen_sistema}
+      MYSQL_USER: ${DB_USER:-sigma_user}
+      MYSQL_PASSWORD: ${DB_PASS:-sigma2026}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql              # datos persistentes
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+      interval: 10s
+    networks:
+      - sigma_network
+
+  # ── phpMyAdmin (administración visual de la BD) ──────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: sigma_erp_pma
+    restart: unless-stopped
+    ports:
+      - "8080:80"         # http://localhost:8080
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_ROOT_PASS:-root2026}
+    depends_on:
+      - db
+    networks:
+      - sigma_network
+
+# ── Volúmenes persistentes ────────────────────────────────
+volumes:
+  db_data:      # datos de MySQL (no se pierden aunque el contenedor se detenga)
+  uploads_data: # archivos subidos (plantillas)
+
+# ── Red interna ───────────────────────────────────────────
+networks:
+  sigma_network:
+    driver: bridge

@@ -28,3 +28,12 @@ desktop.ini
 
 # Carpeta interna de Claude
 .claude/
+
+# Docker — NO ignorar estos (deben ir al repositorio)
+# Dockerfile
+# docker-compose.yml
+# docker/
+
+# Variables de entorno locales (SÍ ignorar)
+.env
+.env.local
