@@ -16,9 +16,28 @@ if (isset($_SESSION['usuario'])) {
 
 $error = '';
 
+// ── Protección contra fuerza bruta ──────────────────────────
+// Máximo 5 intentos fallidos → bloqueo de 15 minutos
+if (!isset($_SESSION['login_intentos']))  $_SESSION['login_intentos']  = 0;
+if (!isset($_SESSION['login_bloqueado'])) $_SESSION['login_bloqueado'] = 0;
+
+$maxIntentos   = 5;
+$tiempoBloqueo = 15 * 60; // 15 minutos en segundos
+
+if ($_SESSION['login_bloqueado'] > 0) {
+    $restante = $_SESSION['login_bloqueado'] - time();
+    if ($restante > 0) {
+        $minutos  = ceil($restante / 60);
+        $error = "Demasiados intentos fallidos. Espera $minutos minuto(s) para intentarlo nuevamente.";
+    } else {
+        // Tiempo de bloqueo expirado, reiniciar
+        $_SESSION['login_intentos']  = 0;
+        $_SESSION['login_bloqueado'] = 0;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // login 
     $usuario  = trim($_POST['usuario']  ?? '');
     $password = trim($_POST['password'] ?? '');
 
@@ -39,21 +58,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$fila) {
             $error = 'Usuario no encontrado.';
+            $_SESSION['login_intentos']++;
         } elseif ((int)$fila['estado'] === 0) {
             $error = 'Cuenta desactivada. Contacte al administrador.';
         } elseif (!password_verify($password, $fila['password'])) {
             $error = 'Contraseña incorrecta.';
+            $_SESSION['login_intentos']++;
         } else {
+            // Login exitoso — reiniciar contadores
+            $_SESSION['login_intentos']  = 0;
+            $_SESSION['login_bloqueado'] = 0;
             // Sesión segura
             session_regenerate_id(true);
-            $_SESSION['id_usuario']     = $fila['id'];
-            $_SESSION['usuario']        = $fila['usuario'];
-            $_SESSION['nombre_completo']= $fila['nombre_completo'] ?: $fila['usuario'];
-            $_SESSION['rol']            = $fila['rol'];
-            $_SESSION['_last_regen']    = time();
-
+            $_SESSION['id_usuario']      = $fila['id'];
+            $_SESSION['usuario']         = $fila['usuario'];
+            $_SESSION['nombre_completo'] = $fila['nombre_completo'] ?: $fila['usuario'];
+            $_SESSION['rol']             = $fila['rol'];
+            $_SESSION['_last_regen']     = time();
             header("Location: " . BASE_URL . "/pages/dashboard.php");
             exit();
+        }
+
+        // Bloquear si supera el máximo de intentos
+        if ($_SESSION['login_intentos'] >= $maxIntentos) {
+            $_SESSION['login_bloqueado'] = time() + $tiempoBloqueo;
+            $error = "Cuenta bloqueada por $maxIntentos intentos fallidos. Espera 15 minutos.";
+        } elseif ($_SESSION['login_intentos'] > 0 && empty($_SESSION['login_bloqueado'])) {
+            $restantes = $maxIntentos - $_SESSION['login_intentos'];
+            $error .= " ($restantes intento(s) restante(s) antes del bloqueo)";
         }
     }
 }
