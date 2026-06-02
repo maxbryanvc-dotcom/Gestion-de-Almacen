@@ -1,4 +1,7 @@
-<?php
+﻿<?php
+ob_start();
+error_reporting(0);
+ini_set('display_errors', 0);
 // ============================================================
 // REPORTE: TRABAJOS EJECUTADOS — formato igual al Excel original
 // GET ?mes=YYYY-MM
@@ -256,13 +259,19 @@ foreach ($tecnicos_mes as $tec) {
 
 $spreadsheet->setActiveSheetIndex(0);
 
-// ── Enviar ─────────────────────────────────────────────────────
+// ── Enviar limpio via temp file ────────────────────────────────
 $filename = 'Trabajos_Ejecutados_' . str_replace('-','_',$mes) . '.xlsx';
+$tmpFile  = tempnam(sys_get_temp_dir(), 'trab_') . '.xlsx';
+(new Xlsx($spreadsheet))->save($tmpFile);
+
 audit_log($conn, 'EXPORT_TRABAJOS', "Trabajos ejecutados $mes");
 
+while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="'.$filename.'"');
+header('Content-Length: ' . filesize($tmpFile));
 header('Cache-Control: max-age=0');
 
-(new Xlsx($spreadsheet))->save('php://output');
+readfile($tmpFile);
+unlink($tmpFile);
 exit();

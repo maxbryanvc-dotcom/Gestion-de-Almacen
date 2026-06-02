@@ -1,4 +1,7 @@
 ﻿<?php
+ob_start();
+error_reporting(0);
+ini_set('display_errors', 0);
 // ============================================================
 // REPORTE KARDEX EN PDF — usa FPDF (ya instalado)
 // ============================================================
@@ -21,24 +24,37 @@ if (!$fpdfLoaded) die('FPDF no encontrado. Verifica la carpeta /fpdf o ejecuta c
 $desde = $_GET['desde'] ?? date('Y-m-01');
 $hasta = $_GET['hasta'] ?? date('Y-m-d');
 
+// Detectar si las columnas opcionales existen
+$colEntradas = array_column($conn->query("SHOW COLUMNS FROM entradas")->fetch_all(MYSQLI_ASSOC), 'Field');
+$colSalidas  = array_column($conn->query("SHOW COLUMNS FROM salidas")->fetch_all(MYSQLI_ASSOC), 'Field');
+$colReingresos = array_column($conn->query("SHOW COLUMNS FROM reingresos")->fetch_all(MYSQLI_ASSOC), 'Field');
+
+$obsEntrada  = in_array('observacion', $colEntradas)  ? "COALESCE(e.observacion,'')" : "''";
+$usrEntrada  = in_array('usuario', $colEntradas)       ? "COALESCE(e.usuario,'—')"   : "'—'";
+$obsSalida   = in_array('observacion', $colSalidas)   ? "COALESCE(s.observacion,'')" : "''";
+$usrSalida   = in_array('usuario', $colSalidas)        ? "COALESCE(s.usuario,'—')"   : "'—'";
+$obsReingreso= in_array('observacion', $colReingresos) ? "COALESCE(r.observacion,'')" : "r.motivo";
+$usrReingreso= in_array('registrado_por', $colReingresos) ? "r.registrado_por"        : "'—'";
+
 // Obtener movimientos del Kardex
-$stmtK = $conn->prepare("
+$sql = "
     SELECT 'ENTRADA' tipo, e.fecha, m.nombre material, m.codigo, e.cantidad,
-           COALESCE(e.observacion,'') obs, COALESCE(e.usuario,'—') usuario
+           $obsEntrada obs, $usrEntrada usuario
     FROM entradas e JOIN materiales m ON m.id=e.material_id
     WHERE DATE(e.fecha) BETWEEN ? AND ?
     UNION ALL
     SELECT 'SALIDA', s.fecha, m.nombre, m.codigo, s.cantidad,
-           COALESCE(s.observacion,''), COALESCE(s.usuario,'—')
+           $obsSalida, $usrSalida
     FROM salidas s JOIN materiales m ON m.id=s.material_id
     WHERE DATE(s.fecha) BETWEEN ? AND ?
     UNION ALL
     SELECT 'REINGRESO', r.fecha, m.nombre, m.codigo, r.cantidad,
-           r.motivo, r.registrado_por
+           $obsReingreso, $usrReingreso
     FROM reingresos r JOIN materiales m ON m.id=r.material_id
     WHERE DATE(r.fecha) BETWEEN ? AND ?
     ORDER BY fecha ASC
-");
+";
+$stmtK = $conn->prepare($sql);
 $stmtK->bind_param('ssssss', $desde, $hasta, $desde, $hasta, $desde, $hasta);
 $stmtK->execute();
 $movimientos = $stmtK->get_result();

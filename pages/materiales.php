@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/layout.php';
 
 $rolActual = $_SESSION['rol'] ?? 'tecnico';
 
-$sql       = "SELECT * FROM materiales WHERE activo = 1 ORDER BY id DESC";
+$sql       = "SELECT * FROM materiales WHERE activo = 1 ORDER BY nombre ASC";
 $resultado = $conn->query($sql);
 ?>
 
@@ -81,13 +81,13 @@ $resultado = $conn->query($sql);
                     </tr>
                 </thead>
                 <tbody>
-                <?php while ($fila = $resultado->fetch_assoc()): ?>
+                <?php $n = 1; while ($fila = $resultado->fetch_assoc()): ?>
                 <?php
                     $stock = (int)$fila['stock'];
                     $badgeHtml = stock_badge($stock);
                 ?>
                 <tr>
-                    <td><strong>#<?= $fila['id'] ?></strong></td>
+                    <td><strong><?= $n++ ?></strong></td>
                     <td><span class="fw-semibold"><?= htmlspecialchars($fila['codigo']) ?></span></td>
                     <td>
                         <div class="d-flex align-items-center gap-2">

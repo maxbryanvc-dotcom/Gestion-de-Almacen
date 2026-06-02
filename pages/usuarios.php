@@ -5,7 +5,6 @@
 require_once __DIR__ . '/../includes/Conexion.php';
 require_once __DIR__ . '/../includes/auth.php';
 verificarRol(['admin']);
-require_once __DIR__ . '/../includes/layout.php';
 
 $msg = '';
 $tipo_msg = '';
@@ -133,6 +132,9 @@ if (isset($_GET['msg'])) {
     if ($_GET['msg'] === 'eliminado') { $msg = 'Usuario eliminado.'; $tipo_msg = 'success'; }
     if ($_GET['msg'] === 'toggle')    { $msg = 'Estado actualizado.'; $tipo_msg = 'info'; }
 }
+
+// ── LAYOUT — después de todas las acciones ────────────────────
+require_once __DIR__ . '/../includes/layout.php';
 ?>
 
 <div class="container-fluid">

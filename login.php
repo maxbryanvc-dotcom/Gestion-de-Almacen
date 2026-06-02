@@ -18,7 +18,7 @@ $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // CSRF básico para login
+    // login 
     $usuario  = trim($_POST['usuario']  ?? '');
     $password = trim($_POST['password'] ?? '');
 

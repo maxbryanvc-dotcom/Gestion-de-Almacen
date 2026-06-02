@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // ============================================================
 // MÓDULO ÓRDENES DE TRABAJO (OT)
 // Tipos: IN=Instalación | CM=Cambio Medidor | MJ=Mejora
@@ -7,7 +7,6 @@
 require_once __DIR__ . '/../includes/Conexion.php';
 require_once __DIR__ . '/../includes/auth.php';
 verificarRol(['admin', 'almacen']);
-require_once __DIR__ . '/../includes/layout.php';
 
 $msg = $tipo_msg = '';
 
@@ -195,6 +194,9 @@ $okMsgs = [
 ];
 $okKey = $_GET['ok'] ?? '';
 if (isset($okMsgs[$okKey])) [$tipo_msg, $msg] = $okMsgs[$okKey];
+
+// ── LAYOUT — después de todas las acciones ────────────────────
+require_once __DIR__ . '/../includes/layout.php';
 ?>
 
 <div class="container-fluid">
@@ -208,9 +210,16 @@ if (isset($okMsgs[$okKey])) [$tipo_msg, $msg] = $okMsgs[$okKey];
             </h2>
             <p class="text-secondary mb-0">Registro diario de trabajos ejecutados en campo</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="<?= BASE_URL ?>/exports/reporte_trabajos.php?mes=<?= $filtro_mes ?>" class="btn btn-success btn-custom">
-                <i class="fa-solid fa-file-excel me-2"></i>Exportar Excel
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- Excel con plantilla oficial de la empresa -->
+            <a href="<?= BASE_URL ?>/exports/generar_trabajos_template.php?mes=<?= $filtro_mes ?>"
+               class="btn btn-success btn-custom" title="Genera el Excel con el formato oficial de la empresa">
+                <i class="fa-solid fa-file-excel me-2"></i>Excel Oficial
+            </a>
+            <!-- Excel genérico dinámico -->
+            <a href="<?= BASE_URL ?>/exports/reporte_trabajos.php?mes=<?= $filtro_mes ?>"
+               class="btn btn-outline-success btn-custom" title="Excel con columnas dinámicas">
+                <i class="fa-solid fa-table me-2"></i>Excel Dinámico
             </a>
             <button class="btn btn-primary btn-custom" id="btnToggleForm">
                 <i class="fa-solid fa-plus me-2"></i>Registrar OT

@@ -5,7 +5,6 @@
 require_once __DIR__ . '/../includes/Conexion.php';
 require_once __DIR__ . '/../includes/auth.php';
 verificarRol(['admin', 'almacen']);
-require_once __DIR__ . '/../includes/layout.php';
 
 $msg = $tipo_msg = '';
 
@@ -26,6 +25,19 @@ if (isset($_GET['anular']) && esAdmin()) {
     $stmt->bind_param('i', $rid);
     $stmt->execute(); $stmt->close();
     header("Location: " . BASE_URL . "/pages/requerimiento.php?ok=anulado"); exit();
+}
+
+// ── ELIMINAR ─────────────────────────────────────────────────
+if (isset($_GET['eliminar']) && esAdmin()) {
+    $rid = intval($_GET['eliminar']);
+    // Eliminar detalle primero (clave foránea)
+    $stmt = $conn->prepare("DELETE FROM detalle_requerimiento WHERE requerimiento_id=?");
+    $stmt->bind_param('i', $rid); $stmt->execute(); $stmt->close();
+    // Eliminar cabecera
+    $stmt2 = $conn->prepare("DELETE FROM requerimientos WHERE id=?");
+    $stmt2->bind_param('i', $rid); $stmt2->execute(); $stmt2->close();
+    audit_log($conn, 'ELIMINAR_REQUERIMIENTO', "ID $rid eliminado");
+    header("Location: " . BASE_URL . "/pages/requerimiento.php?ok=eliminado"); exit();
 }
 
 // ── CREAR REQUERIMIENTO ──────────────────────────────────────
@@ -127,6 +139,9 @@ $lista = $conn->query("
 ");
 
 $tecnicos_lista = $conn->query("SELECT id, nombre, cargo FROM tecnicos ORDER BY nombre ASC");
+
+// ── LAYOUT — siempre al final, después de todas las acciones ──
+require_once __DIR__ . '/../includes/layout.php';
 ?>
 
 <div class="container-fluid">
@@ -152,9 +167,10 @@ $tecnicos_lista = $conn->query("SELECT id, nombre, cargo FROM tecnicos ORDER BY 
     <!-- ALERTAS DE URL -->
     <?php
     $okMsgs = [
-        'creado'   => ['success', 'Requerimiento creado y stock descontado.'],
-        'aprobado' => ['success', 'Requerimiento aprobado.'],
-        'anulado'  => ['warning', 'Requerimiento anulado.'],
+        'creado'    => ['success', 'Requerimiento creado y stock descontado.'],
+        'aprobado'  => ['success', 'Requerimiento aprobado.'],
+        'anulado'   => ['warning', 'Requerimiento anulado.'],
+        'eliminado' => ['success', 'Requerimiento eliminado.'],
     ];
     $okKey = $_GET['ok'] ?? '';
     if (isset($okMsgs[$okKey])): [$tipo_msg, $msg] = $okMsgs[$okKey]; endif;
@@ -335,29 +351,39 @@ $tecnicos_lista = $conn->query("SELECT id, nombre, cargo FROM tecnicos ORDER BY 
                                class="btn btn-secondary btn-sm" title="Ver detalle" target="_blank">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
-                            <!-- Word -->
+                            <!-- Word (plantilla oficial) -->
                             <a href="<?= BASE_URL ?>/exports/generar_word.php?id=<?= $r['id'] ?>"
-                               class="btn btn-primary btn-sm" title="Descargar Word">
+                               class="btn btn-primary btn-sm" title="Word (plantilla fija)">
                                 <i class="fa-solid fa-file-word"></i>
                             </a>
                             <!-- PDF -->
                             <a href="<?= BASE_URL ?>/exports/generar_pdf.php?id=<?= $r['id'] ?>"
-                               class="btn btn-danger btn-sm" title="Descargar PDF">
+                               class="btn btn-danger btn-sm" title="PDF">
                                 <i class="fa-solid fa-file-pdf"></i>
                             </a>
-                            <!-- Aprobar (admin, si pendiente) -->
+                            <!-- Usar plantilla dinámica -->
+                            <button class="btn btn-warning btn-sm"
+                                title="Usar plantilla personalizada"
+                                onclick="usarPlantilla(<?= $r['id'] ?>)">
+                                <i class="fa-solid fa-file-contract"></i>
+                            </button>
+                            <!-- Aprobar / Anular (solo admin, solo Pendiente) -->
                             <?php if (esAdmin() && $est === 'Pendiente'): ?>
-                            <a href="requerimiento.php?aprobar=<?= $r['id'] ?>"
-                               class="btn btn-success btn-sm" title="Aprobar"
-                               onclick="return confirm('¿Aprobar este requerimiento?')">
+                            <button class="btn btn-success btn-sm" title="Aprobar"
+                                onclick="confirmarAccion('aprobar', <?= $r['id'] ?>, '<?= htmlspecialchars($r['codigo_req'] ?? 'REQ-'.$r['id']) ?>')">
                                 <i class="fa-solid fa-check"></i>
-                            </a>
-                            <!-- Anular -->
-                            <a href="requerimiento.php?anular=<?= $r['id'] ?>"
-                               class="btn btn-warning btn-sm" title="Anular"
-                               onclick="return confirm('¿Anular este requerimiento?')">
+                            </button>
+                            <button class="btn btn-warning btn-sm" title="Anular"
+                                onclick="confirmarAccion('anular', <?= $r['id'] ?>, '<?= htmlspecialchars($r['codigo_req'] ?? 'REQ-'.$r['id']) ?>')">
                                 <i class="fa-solid fa-ban"></i>
-                            </a>
+                            </button>
+                            <?php endif; ?>
+                            <!-- Eliminar (solo admin) -->
+                            <?php if (esAdmin()): ?>
+                            <button class="btn btn-danger btn-sm" title="Eliminar"
+                                onclick="confirmarAccion('eliminar', <?= $r['id'] ?>, '<?= htmlspecialchars($r['codigo_req'] ?? 'REQ-'.$r['id']) ?>')">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -637,6 +663,55 @@ document.getElementById('formReq').addEventListener('submit', function(e){
         cancelButtonText:'Revisar'
     }).then(r=>{ if(r.isConfirmed) document.getElementById('formReq').submit(); });
 });
+</script>
+
+<script>
+function confirmarAccion(accion, id, codigo) {
+    const config = {
+        aprobar: {
+            title: '¿Aprobar requerimiento?',
+            text:  `El requerimiento ${codigo} será marcado como Aprobado.`,
+            icon:  'question',
+            btnColor: '#22c55e',
+            btnText: '<i class="fa-solid fa-check me-1"></i>Sí, aprobar',
+            url: 'requerimiento.php?aprobar=' + id
+        },
+        anular: {
+            title: '¿Anular requerimiento?',
+            text:  `El requerimiento ${codigo} será marcado como Anulado.`,
+            icon:  'warning',
+            btnColor: '#f59e0b',
+            btnText: '<i class="fa-solid fa-ban me-1"></i>Sí, anular',
+            url: 'requerimiento.php?anular=' + id
+        },
+        eliminar: {
+            title: '¿Eliminar requerimiento?',
+            text:  `Se eliminará ${codigo} y todo su detalle. Esta acción no se puede deshacer.`,
+            icon:  'error',
+            btnColor: '#ef4444',
+            btnText: '<i class="fa-solid fa-trash me-1"></i>Sí, eliminar',
+            url: 'requerimiento.php?eliminar=' + id
+        }
+    };
+    const c = config[accion];
+    Swal.fire({
+        title: c.title,
+        text:  c.text,
+        icon:  c.icon,
+        showCancelButton:   true,
+        confirmButtonColor: c.btnColor,
+        cancelButtonColor:  '#64748b',
+        confirmButtonText:  c.btnText,
+        cancelButtonText:   'Cancelar'
+    }).then(r => { if (r.isConfirmed) window.location.href = c.url; });
+}
+</script>
+
+<script>
+function usarPlantilla(reqId) {
+    // Redirigir a Plantillas con contexto del requerimiento preseleccionado
+    window.location.href = BASE_URL + '/pages/plantillas.php?tab=word&req_id=' + reqId;
+}
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

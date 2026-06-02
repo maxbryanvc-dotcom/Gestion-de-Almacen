@@ -1,11 +1,11 @@
 <?php
 // ============================================================
 // GESTIÓN DE TÉCNICOS
+// Todas las acciones con header() ANTES de cargar layout.php
 // ============================================================
 require_once __DIR__ . '/../includes/Conexion.php';
 require_once __DIR__ . '/../includes/auth.php';
 verificarRol(['admin', 'almacen']);
-require_once __DIR__ . '/../includes/layout.php';
 
 $msg = $tipo_msg = '';
 
@@ -54,23 +54,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'edita
     }
 }
 
-// ── ELIMINAR ─────────────────────────────────────────────────
+// ── ELIMINAR — va ANTES de layout.php para poder redirigir ───
 if (isset($_GET['eliminar']) && is_numeric($_GET['eliminar'])) {
     $id = intval($_GET['eliminar']);
+
+    // Obtener nombre para el log
+    $stmtN = $conn->prepare("SELECT nombre FROM tecnicos WHERE id=? LIMIT 1");
+    $stmtN->bind_param('i', $id);
+    $stmtN->execute();
+    $nomTec = $stmtN->get_result()->fetch_assoc()['nombre'] ?? 'desconocido';
+    $stmtN->close();
+
+    // Desvincular registros históricos (poner NULL en tecnico_id)
+    foreach (['requerimientos','salidas','ordenes_trabajo','reingresos'] as $tabla) {
+        $st = $conn->prepare("UPDATE `$tabla` SET tecnico_id = NULL WHERE tecnico_id = ?");
+        $st->bind_param('i', $id);
+        $st->execute();
+        $st->close();
+    }
+
+    // Eliminar técnico
     $stmt = $conn->prepare("DELETE FROM tecnicos WHERE id=?");
     $stmt->bind_param('i', $id);
     if ($stmt->execute()) {
-        audit_log($conn, 'ELIMINAR_TECNICO', "ID $id");
-        header("Location: " . BASE_URL . "/pages/tecnicos.php?msg=eliminado"); exit();
+        audit_log($conn, 'ELIMINAR_TECNICO', "ID $id: $nomTec — renunció");
+        header("Location: " . BASE_URL . "/pages/tecnicos.php?msg=eliminado");
+        exit();
     }
     $stmt->close();
 }
+
 if (isset($_GET['msg'])) {
-    $msg = 'Técnico eliminado.'; $tipo_msg = 'success';
+    $msg = 'Técnico eliminado del sistema.'; $tipo_msg = 'success';
 }
 
 // ── LISTAR ───────────────────────────────────────────────────
 $tecnicos = $conn->query("SELECT * FROM tecnicos ORDER BY nombre ASC");
+
+// ── LAYOUT — se carga DESPUÉS de todas las acciones ──────────
+require_once __DIR__ . '/../includes/layout.php';
 ?>
 
 <div class="container-fluid">
@@ -105,11 +127,13 @@ $tecnicos = $conn->query("SELECT * FROM tecnicos ORDER BY nombre ASC");
                     <tr><th>#</th><th>Nombre</th><th>DNI</th><th>Celular</th><th>Área</th><th>Cargo</th><th>Reqs.</th><th>Acciones</th></tr>
                 </thead>
                 <tbody>
-                <?php while ($t = $tecnicos->fetch_assoc()):
+                <?php $n = 1; while ($t = $tecnicos->fetch_assoc()):
                     $nReqs = $conn->query("SELECT COUNT(*) c FROM requerimientos WHERE tecnico_id={$t['id']}")->fetch_assoc()['c'];
+                    $nOTs  = $conn->query("SELECT COUNT(*) c FROM ordenes_trabajo WHERE tecnico_id={$t['id']}")->fetch_assoc()['c'];
+                    $total = $nReqs + $nOTs;
                 ?>
                 <tr>
-                    <td><strong>#<?= $t['id'] ?></strong></td>
+                    <td><strong><?= $n++ ?></strong></td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:white;flex-shrink:0;">
@@ -122,7 +146,10 @@ $tecnicos = $conn->query("SELECT * FROM tecnicos ORDER BY nombre ASC");
                     <td><?= htmlspecialchars($t['celular'] ?? '—') ?></td>
                     <td><span class="badge bg-secondary"><?= htmlspecialchars($t['area'] ?? '—') ?></span></td>
                     <td><?= htmlspecialchars($t['cargo'] ?? '—') ?></td>
-                    <td><span class="badge bg-primary"><?= $nReqs ?></span></td>
+                    <td>
+                        <span class="badge bg-primary" title="Requerimientos"><?= $nReqs ?> req</span>
+                        <span class="badge bg-secondary ms-1" title="OTs"><?= $nOTs ?> OT</span>
+                    </td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-warning btn-sm"
@@ -130,13 +157,11 @@ $tecnicos = $conn->query("SELECT * FROM tecnicos ORDER BY nombre ASC");
                                 title="Editar">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
-                            <?php if ($nReqs == 0): ?>
-                            <a href="tecnicos.php?eliminar=<?= $t['id'] ?>"
-                               class="btn btn-danger btn-sm"
-                               onclick="return confirm('¿Eliminar técnico?')" title="Eliminar">
-                                <i class="fa-solid fa-trash"></i>
-                            </a>
-                            <?php endif; ?>
+                            <button class="btn btn-danger btn-sm"
+                                onclick="eliminarTecnico(<?= $t['id'] ?>, '<?= htmlspecialchars($t['nombre']) ?>', <?= $total ?>)"
+                                title="Eliminar técnico">
+                                <i class="fa-solid fa-user-minus"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -241,6 +266,31 @@ function abrirEditar(t){
     document.getElementById('e_area').value   = t.area   || '';
     document.getElementById('e_cargo').value  = t.cargo  || '';
     new bootstrap.Modal(document.getElementById('modalEditar')).show();
+}
+
+function eliminarTecnico(id, nombre, totalRegistros){
+    const tieneHistorial = totalRegistros > 0;
+    Swal.fire({
+        title: `¿Eliminar a ${nombre}?`,
+        html: tieneHistorial
+            ? `<p>Este técnico tiene <strong>${totalRegistros} registro(s)</strong> en el sistema.</p>
+               <p class="text-warning" style="font-size:13px;">
+                 <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                 Sus requerimientos y órdenes de trabajo quedarán sin técnico asignado,
+                 pero el historial <strong>no se perderá</strong>.
+               </p>`
+            : `<p>El técnico no tiene registros asociados.</p>`,
+        icon: tieneHistorial ? 'warning' : 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor:  '#64748b',
+        confirmButtonText:  '<i class="fa-solid fa-user-minus me-1"></i>Sí, eliminar',
+        cancelButtonText:   'Cancelar',
+    }).then(r => {
+        if (r.isConfirmed) {
+            window.location.href = 'tecnicos.php?eliminar=' + id;
+        }
+    });
 }
 </script>
 

@@ -43,8 +43,12 @@ function csrf_verify(): void {
     }
 }
 
-/** Registra auditoría de una acción */
+/** Registra auditoría de una acción (silencioso si la tabla no existe) */
 function audit_log(mysqli $conn, string $accion, string $descripcion = ''): void {
+    // Verificar que la tabla existe antes de insertar
+    $check = $conn->query("SHOW TABLES LIKE 'audit_log'");
+    if (!$check || $check->num_rows === 0) return;
+
     $usuario = $_SESSION['usuario'] ?? 'desconocido';
     $rol     = $_SESSION['rol']     ?? 'desconocido';
     $ip      = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';

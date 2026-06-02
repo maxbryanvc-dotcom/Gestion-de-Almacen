@@ -1,4 +1,7 @@
-<?php
+﻿<?php
+ob_start();
+error_reporting(0);
+ini_set('display_errors', 0);
 // ============================================================
 // EXPORTAR LIQUIDACIÓN MENSUAL — Instalaciones o Mantenimiento
 // Formato idéntico al Excel original de ElectroSur Este
@@ -463,13 +466,19 @@ for ($ci = $col_inicio_aprob; $ci <= $totalCols; $ci++) {
 
 $ws->freezePane('E6');
 
-// ── Enviar archivo ────────────────────────────────────────────
+// ── Enviar archivo limpio via temp file ───────────────────────
 $filename = 'Liquidacion_' . str_replace(' ','_',$tipo_liq) . '_' . str_replace('-','_',$mes) . '.xlsx';
+$tmpFile  = tempnam(sys_get_temp_dir(), 'liq_') . '.xlsx';
+(new Xlsx($spreadsheet))->save($tmpFile);
+
 audit_log($conn, 'EXPORT_LIQUIDACION', "$tipo_liq $mes");
 
+while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="'.$filename.'"');
+header('Content-Length: ' . filesize($tmpFile));
 header('Cache-Control: max-age=0');
 
-(new Xlsx($spreadsheet))->save('php://output');
+readfile($tmpFile);
+unlink($tmpFile);
 exit();
