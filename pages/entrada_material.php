@@ -23,11 +23,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tipo_msg = 'error';
     } else {
         // Prepared statement — sin SQL injection
+        $fecha = date('Y-m-d H:i:s');
         $stmt = $conn->prepare(
-            "INSERT INTO entradas (material_id, cantidad, observacion, usuario)
-             VALUES (?, ?, ?, ?)"
+            "INSERT INTO entradas (material_id, cantidad, fecha, observacion, usuario)
+             VALUES (?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param('iiss', $material_id, $cantidad, $observacion, $usuario);
+        $stmt->bind_param('iisss', $material_id, $cantidad, $fecha, $observacion, $usuario);
 
         if ($stmt->execute()) {
             $stmt->close();
