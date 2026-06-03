@@ -331,7 +331,7 @@ require_once __DIR__ . '/../includes/layout.php';
                     Materiales utilizados
                     <small class="text-secondary fw-normal ms-1">(opcional)</small>
                 </label>
-                <button type="button" class="btn btn-success btn-sm btn-custom" onclick="agregarFila()">
+                <button type="button" class="btn btn-success btn-sm btn-custom" onclick="agregarFilaOT()">
                     <i class="fa-solid fa-plus me-1"></i>Agregar material
                 </button>
             </div>
@@ -623,12 +623,12 @@ function verMateriales(id, num){
     });
 }
 
-// ── Autocomplete materiales (reutiliza lógica de requerimiento) ──
-let filaIdx = 0;
+// ── Materiales de la OT — funciones propias (sin conflicto con materiales_ajax.js) ──
+let otFilaIdx = 0;   // nombre distinto para no chocar con filaIdx global
 
-function agregarFila(){
+function agregarFilaOT(){
     const tbody = document.getElementById('tbodyMats');
-    const idx   = filaIdx++;
+    const idx   = otFilaIdx++;
     const tr    = document.createElement('tr');
     tr.className = 'fila-mat';
     tr.innerHTML = `
@@ -636,73 +636,79 @@ function agregarFila(){
             <input type="hidden" name="material_id[]" class="inp-id" value="">
             <div style="position:relative;">
                 <input type="text" class="form-control form-control-sm inp-buscar"
-                       placeholder="Buscar material..." autocomplete="off" data-idx="${idx}">
-                <div class="autocomplete-list" id="ac-${idx}" style="display:none;position:absolute;z-index:9999;background:#1e293b;border:1px solid #334155;border-radius:10px;width:100%;max-height:200px;overflow-y:auto;"></div>
+                       placeholder="Buscar material..." autocomplete="off">
+                <div class="drop-container" id="otac-${idx}"
+                     style="display:none;position:absolute;z-index:9999;
+                            top:100%;left:0;right:0;max-height:200px;overflow-y:auto;"></div>
             </div>
         </td>
-        <td><span class="inp-cod text-secondary" style="font-size:12px;">—</span></td>
+        <td><span class="inp-cod text-secondary" style="font-size:11px;">—</span></td>
         <td><span class="inp-stk">—</span></td>
         <td>
             <input type="number" name="cantidad[]" class="form-control form-control-sm inp-cant"
                    min="0.01" step="0.01" max="0" placeholder="0" disabled style="max-width:90px;">
         </td>
-        <td><span class="inp-und text-secondary" style="font-size:12px;">—</span></td>
+        <td><span class="inp-und text-secondary" style="font-size:11px;">—</span></td>
         <td>
-            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove();contarFilas()">
+            <button type="button" class="btn btn-danger btn-sm"
+                    onclick="this.closest('tr').remove();contarFilasOT()">
                 <i class="fa-solid fa-times"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);
-    iniciarAC(tr, idx);
-    contarFilas();
+    iniciarACOT(tr, idx);
+    contarFilasOT();
 }
 
-function contarFilas(){
+function contarFilasOT(){
     const n = document.getElementById('tbodyMats').children.length;
     document.getElementById('sinMats').style.display = n===0?'block':'none';
 }
 
-function iniciarAC(tr, idx){
-    const inp  = tr.querySelector('.inp-buscar');
-    const lista= document.getElementById('ac-'+idx);
-    let timer  = null;
+function iniciarACOT(tr, idx){
+    const inp   = tr.querySelector('.inp-buscar');
+    const lista = document.getElementById('otac-'+idx);
+    let timer   = null;
 
-    inp.addEventListener('input',function(){
+    inp.addEventListener('input', function(){
         clearTimeout(timer);
         const q = this.value.trim();
-        if(q.length<1){ lista.style.display='none'; return; }
+        if(q.length < 1){ lista.style.display='none'; return; }
         timer = setTimeout(()=>{
             fetch(BASE_URL+'/api/buscar_material.php?q='+encodeURIComponent(q))
             .then(r=>r.json()).then(data=>{
                 lista.innerHTML='';
                 if(!data.length){ lista.style.display='none'; return; }
                 data.forEach(m=>{
-                    const div=document.createElement('div');
-                    div.style.cssText='padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.06);';
-                    const sc=m.stock<=0?'#ef4444':(m.stock<=5?'#f59e0b':'#22c55e');
-                    div.innerHTML=`<span>${m.nombre}</span><span style="color:${sc};font-size:11px;font-weight:700;">Stock: ${m.stock}</span>`;
-                    div.addEventListener('mouseenter',()=>div.style.background='rgba(59,130,246,0.18)');
-                    div.addEventListener('mouseleave',()=>div.style.background='');
-                    div.addEventListener('click',()=>seleccionar(m,tr,lista));
+                    const sc = m.stock<=0?'rojo':(m.stock<=5?'amarillo':'verde');
+                    const div = document.createElement('div');
+                    div.className = 'drop-item';
+                    div.innerHTML = `
+                        <div class="di-icon"><i class="fa-solid fa-box"></i></div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="drop-item-nombre">${m.nombre}</div>
+                            <div class="drop-item-meta">${m.codigo||''} · ${m.unidad}</div>
+                        </div>
+                        <span class="drop-stock ${sc}">Stock: ${m.stock}</span>`;
+                    div.addEventListener('click',()=>seleccionarOT(m,tr,lista));
                     lista.appendChild(div);
                 });
                 lista.style.display='block';
             });
         },280);
     });
-    document.addEventListener('click',e=>{ if(!tr.contains(e.target)) lista.style.display='none'; });
+    document.addEventListener('click', e=>{ if(!tr.contains(e.target)) lista.style.display='none'; });
 }
 
-function seleccionar(m,tr,lista){
-    tr.querySelector('.inp-id').value      = m.id;
-    tr.querySelector('.inp-buscar').value  = m.nombre;
-    tr.querySelector('.inp-cod').textContent = m.codigo||'—';
-    tr.querySelector('.inp-und').textContent = m.unidad;
+function seleccionarOT(m, tr, lista){
+    tr.querySelector('.inp-id').value         = m.id;
+    tr.querySelector('.inp-buscar').value     = m.nombre;
+    tr.querySelector('.inp-cod').textContent  = m.codigo||'—';
+    tr.querySelector('.inp-und').textContent  = m.unidad;
     const bg = m.stock<=0?'danger':(m.stock<=5?'warning':(m.stock<=10?'info':'success'));
-    tr.querySelector('.inp-stk').innerHTML =
-        `<span class="badge bg-${bg}">${m.stock}</span>`;
-    const c=tr.querySelector('.inp-cant');
-    c.disabled=m.stock<=0; c.max=m.stock; c.value=m.stock>0?1:0;
+    tr.querySelector('.inp-stk').innerHTML    = `<span class="badge bg-${bg}">${m.stock}</span>`;
+    const c = tr.querySelector('.inp-cant');
+    c.disabled = m.stock<=0; c.max = m.stock; c.value = m.stock>0?1:0;
     lista.style.display='none';
 }
 

@@ -468,11 +468,11 @@ function actualizarContador(){
 }
 
 // ── Agregar fila dinámica ────────────────────────────────────
-let filaIdx = 0;
+let reqFilaIdx = 0;  // nombre distinto para no chocar con filaIdx de materiales_ajax.js
 
 function agregarFila(){
     const tbody = document.getElementById('tbodyMateriales');
-    const idx = filaIdx++;
+    const idx = reqFilaIdx++;
 
     const tr = document.createElement('tr');
     tr.className = 'fila-material';
