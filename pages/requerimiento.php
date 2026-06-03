@@ -247,51 +247,56 @@ require_once __DIR__ . '/../includes/layout.php';
             </div>
         </div>
 
-        <!-- Tabla de materiales -->
+        <!-- Buscador de materiales -->
         <div class="mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <label class="form-label mb-0 fw-semibold">
-                    <i class="fa-solid fa-list me-1"></i>Materiales solicitados *
-                </label>
-                <button type="button" class="btn btn-success btn-sm btn-custom" onclick="agregarFila()">
-                    <i class="fa-solid fa-plus me-1"></i>Agregar material
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-magnifying-glass me-1 text-primary"></i>
+                Materiales solicitados *
+            </label>
+            <div class="d-flex gap-2">
+                <div style="flex:1;position:relative;">
+                    <input type="text" id="buscadorReq" class="form-control"
+                           placeholder="Escribe el nombre del material a solicitar..."
+                           autocomplete="off">
+                    <div id="dropdownReq" class="drop-container"
+                         style="display:none;position:absolute;top:100%;left:0;right:0;
+                                z-index:9999;max-height:220px;overflow-y:auto;margin-top:4px;">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-custom"
+                        onclick="document.getElementById('buscadorReq').value='';
+                                 document.getElementById('dropdownReq').style.display='none';">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
-            <div class="table-responsive">
-                <table class="table align-middle" style="table-layout:fixed;">
-                    <colgroup>
-                        <col style="width:40%">
-                        <col style="width:12%">
-                        <col style="width:10%">
-                        <col style="width:22%">
-                        <col style="width:10%">
-                        <col style="width:6%">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>Material</th>
-                            <th>Código</th>
-                            <th>Stock</th>
-                            <th>Cantidad</th>
-                            <th>Unidad</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyMateriales"></tbody>
-                </table>
-            </div>
-            <div id="msgSinFilas" class="text-secondary text-center py-3" style="display:none;">
+            <small class="text-secondary mt-1 d-block" style="font-size:11px;">
                 <i class="fa-solid fa-circle-info me-1"></i>
-                Haz clic en "Agregar material" para comenzar
-            </div>
+                Agrega todos los materiales que necesitas pedir a ElectroSur Este.
+            </small>
         </div>
 
-        <!-- Resumen -->
-        <div id="resumen" class="d-flex align-items-center justify-content-between flex-wrap gap-3 mt-2" style="display:none!important;">
-            <div>
-                <span class="text-secondary">Total ítems:</span>
-                <strong id="totalItems" class="ms-1">0</strong>
+        <!-- Cards de materiales seleccionados -->
+        <div id="listaMatsReq" class="mb-3"></div>
+
+        <div id="msgSinFilas" class="text-center py-4 mb-3"
+             style="border:2px dashed rgba(59,130,246,0.2);border-radius:14px;">
+            <i class="fa-solid fa-file-lines fa-2x mb-2"
+               style="color:rgba(59,130,246,0.25);"></i>
+            <p class="text-secondary mb-0" style="font-size:13px;">
+                No hay materiales agregados. Usa el buscador de arriba.
+            </p>
+        </div>
+
+        <!-- inputs ocultos para el POST -->
+        <div id="inputsOcultosReq"></div>
+
+        <!-- Botón guardar -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div id="resumenReq" style="display:none;">
+                <span class="text-secondary" style="font-size:13px;">
+                    <i class="fa-solid fa-check-circle text-primary me-1"></i>
+                    <strong id="totalItems">0</strong> material(es) listo(s)
+                </span>
             </div>
             <button type="submit" class="btn btn-primary btn-custom px-5" id="btnGuardar" disabled>
                 <i class="fa-solid fa-floppy-disk me-2"></i>Registrar Requerimiento
@@ -453,213 +458,177 @@ $(document).ready(()=>$('#tablaReq').DataTable({
     responsive:true, pageLength:10, language:dtLang, order:[[0,'desc']]
 }));
 
-// ── Contador de filas y estado del botón Guardar ─────────────
-function actualizarContador(){
-    const filas = document.querySelectorAll('#tbodyMateriales tr.fila-material');
-    const validas = [...filas].filter(tr => {
-        const id   = tr.querySelector('.inp-mat-id').value;
-        const cant = parseInt(tr.querySelector('.inp-cant').value)||0;
-        return id > 0 && cant > 0;
-    });
-    document.getElementById('totalItems').textContent = validas.length;
-    document.getElementById('btnGuardar').disabled = validas.length === 0;
-    document.getElementById('resumen').style.removeProperty('display');
-    document.getElementById('msgSinFilas').style.display = filas.length===0?'block':'none';
-}
+// ── Sistema de cards para materiales del requerimiento ────────
+const matsReq   = {};
+let timerReq    = null;
 
-// ── Agregar fila dinámica ────────────────────────────────────
-let reqFilaIdx = 0;  // nombre distinto para no chocar con filaIdx de materiales_ajax.js
+document.getElementById('buscadorReq').addEventListener('input', function(){
+    clearTimeout(timerReq);
+    const q   = this.value.trim();
+    const drop= document.getElementById('dropdownReq');
+    if(q.length < 1){ drop.style.display='none'; return; }
 
-function agregarFila(){
-    const tbody = document.getElementById('tbodyMateriales');
-    const idx = reqFilaIdx++;
+    timerReq = setTimeout(()=>{
+        fetch(BASE_URL+'/api/buscar_material.php?q='+encodeURIComponent(q))
+        .then(r=>r.json()).then(data=>{
+            drop.innerHTML='';
+            if(!data.length){
+                drop.innerHTML='<div class="drop-item"><span class="drop-item-nombre" style="opacity:.5;">Sin resultados</span></div>';
+                drop.style.display='block'; return;
+            }
+            data.forEach(m=>{
+                const yaEsta = !!matsReq[m.id];
+                const sc = m.stock<=0?'rojo':(m.stock<=5?'amarillo':'verde');
+                const div= document.createElement('div');
+                div.className='drop-item'+(yaEsta?' ac-active':'');
+                div.innerHTML=`
+                    <div class="di-icon" style="background:rgba(59,130,246,0.12);color:#60a5fa;">
+                        <i class="fa-solid fa-box"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="drop-item-nombre">${m.nombre}
+                            ${yaEsta?'<span class="badge bg-primary ms-2" style="font-size:9px;">✓ Agregado</span>':''}
+                        </div>
+                        <div class="drop-item-meta">${m.codigo||''} · ${m.unidad}</div>
+                    </div>
+                    <span class="drop-stock ${sc}">Stock: ${m.stock}</span>`;
+                if(!yaEsta){
+                    div.addEventListener('click',()=>{
+                        agregarMatReq(m);
+                        document.getElementById('buscadorReq').value='';
+                        drop.style.display='none';
+                    });
+                }
+                drop.appendChild(div);
+            });
+            drop.style.display='block';
+        });
+    },260);
+});
 
-    const tr = document.createElement('tr');
-    tr.className = 'fila-material';
-    tr.dataset.idx = idx;
-    tr.innerHTML = `
-        <td>
-            <input type="hidden" name="material_id[]" class="inp-mat-id" value="">
-            <div class="autocomplete-wrap">
-                <input type="text"
-                       class="form-control input-material-nombre inp-buscar"
-                       placeholder="Buscar material..."
-                       autocomplete="off"
-                       data-idx="${idx}">
-                <div class="autocomplete-list" id="ac-${idx}" style="display:none;"></div>
+document.addEventListener('click',e=>{
+    const inp =document.getElementById('buscadorReq');
+    const drop=document.getElementById('dropdownReq');
+    if(inp&&drop&&!inp.contains(e.target)&&!drop.contains(e.target))
+        drop.style.display='none';
+});
+
+function agregarMatReq(m){
+    if(matsReq[m.id]) return;
+    matsReq[m.id]={...m, cant:1};
+
+    const sc = m.stock<=0?'rojo':(m.stock<=5?'amarillo':'verde');
+    const div= document.createElement('div');
+    div.id   = 'reqmat-'+m.id;
+    div.className='mat-req-item';
+    div.innerHTML=`
+        <div class="mat-req-icon"><i class="fa-solid fa-box"></i></div>
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;">${m.nombre}</div>
+            <div style="font-size:11px;color:#64748b;">
+                ${m.codigo?'<span class="me-2">'+m.codigo+'</span>':''}
+                <span>${m.unidad}</span>
+                <span class="drop-stock ${sc} ms-2" style="font-size:10px;">Stock: ${m.stock}</span>
             </div>
-        </td>
-        <td>
-            <span class="inp-codigo text-secondary" style="font-size:12px;">—</span>
-        </td>
-        <td>
-            <span class="inp-stock-badge">—</span>
-        </td>
-        <td>
-            <input type="number" name="cantidad[]"
-                   class="form-control form-control-sm inp-cant"
-                   min="1" max="0" value="" placeholder="0"
-                   disabled style="max-width:100px;">
-        </td>
-        <td>
-            <span class="inp-unidad text-secondary" style="font-size:12px;">—</span>
-        </td>
-        <td>
-            <button type="button" class="btn btn-danger btn-sm"
-                    onclick="quitarFila(this)" title="Quitar">
-                <i class="fa-solid fa-times"></i>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm"
+                    style="background:rgba(255,255,255,.06);border:none;color:#64748b;
+                           width:30px;height:30px;border-radius:8px;"
+                    onclick="cambiarCantReq(${m.id},-1)">
+                <i class="fa-solid fa-minus" style="font-size:10px;"></i>
             </button>
-        </td>
-    `;
-    tbody.appendChild(tr);
-    tr.querySelector('.inp-buscar').focus();
-    iniciarAutocomplete(tr, idx);
-    actualizarContador();
-}
+            <input type="number" class="cant-req-input" id="cantreq-${m.id}"
+                   value="1" min="1" step="1" max="${m.stock > 0 ? m.stock : 9999}"
+                   onchange="validarCantReq(${m.id},${m.stock})"
+                   oninput="validarCantReq(${m.id},${m.stock})">
+            <button type="button" class="btn btn-sm"
+                    style="background:rgba(255,255,255,.06);border:none;color:#64748b;
+                           width:30px;height:30px;border-radius:8px;"
+                    onclick="cambiarCantReq(${m.id},1)">
+                <i class="fa-solid fa-plus" style="font-size:10px;"></i>
+            </button>
+        </div>
+        <button type="button" class="btn btn-sm"
+                style="background:rgba(239,68,68,.1);border:none;color:#ef4444;
+                       width:34px;height:34px;border-radius:10px;flex-shrink:0;"
+                onclick="quitarMatReq(${m.id})">
+            <i class="fa-solid fa-xmark"></i>
+        </button>`;
+    document.getElementById('listaMatsReq').appendChild(div);
+    sincronizarReq();
+    actualizarEstadoReq();
 
-// ── Quitar fila ──────────────────────────────────────────────
-function quitarFila(btn){
-    btn.closest('tr').remove();
-    actualizarContador();
-}
-
-// ── Autocomplete AJAX ────────────────────────────────────────
-function iniciarAutocomplete(tr, idx){
-    const input  = tr.querySelector('.inp-buscar');
-    const lista  = document.getElementById('ac-' + idx);
-    let timer    = null;
-    let acIdx    = -1;
-
-    input.addEventListener('input', function(){
-        clearTimeout(timer);
-        const q = this.value.trim();
-        if (q.length < 1) { lista.style.display='none'; limpiarFila(tr); return; }
-
-        timer = setTimeout(()=>{
-            fetch(BASE_URL + '/api/buscar_material.php?q=' + encodeURIComponent(q))
-            .then(r=>r.json())
-            .then(data => renderDropdown(data, lista, tr, idx));
-        }, 280);
-    });
-
-    // Navegación con teclado
-    input.addEventListener('keydown', function(e){
-        const items = lista.querySelectorAll('.ac-item');
-        if (e.key === 'ArrowDown') { acIdx = Math.min(acIdx+1, items.length-1); resaltarItem(items,acIdx); e.preventDefault(); }
-        else if (e.key === 'ArrowUp') { acIdx = Math.max(acIdx-1, 0); resaltarItem(items,acIdx); e.preventDefault(); }
-        else if (e.key === 'Enter' && acIdx >= 0) { items[acIdx].click(); e.preventDefault(); }
-        else if (e.key === 'Escape') { lista.style.display='none'; acIdx=-1; }
-    });
-
-    // Cerrar al hacer click fuera
-    document.addEventListener('click', e=>{
-        if (!tr.contains(e.target)) lista.style.display='none';
-    });
-}
-
-function resaltarItem(items, idx){
-    items.forEach((el,i) => el.classList.toggle('ac-active', i===idx));
-    if(items[idx]) items[idx].scrollIntoView({block:'nearest'});
-}
-
-function renderDropdown(data, lista, tr, idx){
-    lista.innerHTML = '';
-    if (!data.length) {
-        lista.innerHTML = '<div class="ac-item"><span class="ac-nombre text-secondary">Sin resultados</span></div>';
-        lista.style.display = 'block';
-        return;
+    if(m.stock <= 0){
+        Swal.fire({title:'Sin stock',
+            text:`"${m.nombre}" tiene stock 0. Igual puedes incluirlo en el requerimiento.`,
+            icon:'info',timer:2500,showConfirmButton:false});
     }
-    data.forEach(m => {
-        const div = document.createElement('div');
-        div.className = 'ac-item';
-        const stockColor = m.stock<=0?'#ef4444':(m.stock<=5?'#f59e0b':'#22c55e');
-        div.innerHTML = `
-            <span class="ac-nombre">${m.nombre}</span>
-            <div class="ac-meta">
-                <div>${m.codigo || ''}</div>
-                <div style="color:${stockColor};font-weight:700;">Stock: ${m.stock}</div>
-            </div>
-        `;
-        div.addEventListener('click', () => seleccionarMaterial(m, tr, lista));
-        lista.appendChild(div);
+}
+
+function cambiarCantReq(id, delta){
+    const inp=document.getElementById('cantreq-'+id);
+    if(!inp) return;
+    let v=parseInt(inp.value)||0;
+    v=Math.max(1,v+delta);
+    inp.value=v; if(matsReq[id]) matsReq[id].cant=v;
+    sincronizarReq();
+}
+
+function validarCantReq(id, maxStock){
+    const inp=document.getElementById('cantreq-'+id);
+    if(!inp) return;
+    let v=parseInt(inp.value)||0;
+    if(v<1){inp.value=1;v=1;}
+    inp.style.borderColor = (maxStock>0 && v>maxStock)?'#ef4444':'';
+    if(matsReq[id]) matsReq[id].cant=v;
+    sincronizarReq();
+}
+
+function quitarMatReq(id){
+    delete matsReq[id];
+    const el=document.getElementById('reqmat-'+id);
+    if(el){el.style.opacity='0';el.style.transform='translateX(8px)';
+           setTimeout(()=>el.remove(),180);}
+    sincronizarReq();
+    actualizarEstadoReq();
+}
+
+function actualizarEstadoReq(){
+    const total=Object.keys(matsReq).length;
+    document.getElementById('msgSinFilas').style.display=total===0?'block':'none';
+    document.getElementById('resumenReq').style.display=total>0?'block':'none';
+    document.getElementById('totalItems').textContent=total;
+    document.getElementById('btnGuardar').disabled=total===0;
+}
+
+function sincronizarReq(){
+    const cont=document.getElementById('inputsOcultosReq');
+    cont.innerHTML='';
+    Object.values(matsReq).forEach(m=>{
+        cont.innerHTML+=`<input type="hidden" name="material_id[]" value="${m.id}">
+                         <input type="hidden" name="cantidad[]" value="${m.cant}">`;
     });
-    lista.style.display = 'block';
 }
 
-function seleccionarMaterial(m, tr, lista){
-    // Rellenar campos de la fila
-    tr.querySelector('.inp-mat-id').value       = m.id;
-    tr.querySelector('.inp-buscar').value        = m.nombre;
-    tr.querySelector('.inp-codigo').textContent  = m.codigo || '—';
-    tr.querySelector('.inp-unidad').textContent  = m.unidad;
-
-    // Badge de stock
-    const stock = m.stock;
-    let bg = stock<=0?'danger':(stock<=5?'warning':(stock<=10?'info':'success'));
-    tr.querySelector('.inp-stock-badge').innerHTML =
-        `<span class="badge bg-${bg} stock-badge-inline">${stock}</span>`;
-
-    // Input de cantidad
-    const cantInput = tr.querySelector('.inp-cant');
-    cantInput.disabled = stock <= 0;
-    cantInput.max      = stock;
-    cantInput.min      = 1;
-    cantInput.value    = stock > 0 ? 1 : 0;
-    if (stock <= 0) {
-        cantInput.value = 0;
-        Swal.fire({title:'Sin stock',text:`"${m.nombre}" no tiene stock disponible.`,icon:'warning',timer:2500});
-    }
-
-    // Validación en tiempo real de cantidad
-    cantInput.oninput = function(){
-        const v = parseInt(this.value)||0;
-        if(v > stock){
-            this.value = stock;
-            this.style.borderColor = '#ef4444';
-        } else {
-            this.style.borderColor = '';
-        }
-        actualizarContador();
-    };
-
-    lista.style.display = 'none';
-    actualizarContador();
-    tr.querySelector('.inp-cant').focus();
-}
-
-function limpiarFila(tr){
-    tr.querySelector('.inp-mat-id').value      = '';
-    tr.querySelector('.inp-codigo').textContent = '—';
-    tr.querySelector('.inp-unidad').textContent = '—';
-    tr.querySelector('.inp-stock-badge').innerHTML = '—';
-    const c = tr.querySelector('.inp-cant');
-    c.disabled = true; c.value = ''; c.max = 0;
-    actualizarContador();
-}
-
-// ── Validación antes de enviar ───────────────────────────────
+// ── Validación y confirmación antes de enviar ────────────────
 document.getElementById('formReq').addEventListener('submit', function(e){
-    const filas = [...document.querySelectorAll('#tbodyMateriales tr.fila-material')];
-    const validas = filas.filter(tr=>{
-        const id   = tr.querySelector('.inp-mat-id').value;
-        const cant = parseInt(tr.querySelector('.inp-cant').value)||0;
-        return id > 0 && cant > 0;
-    });
-    if(validas.length === 0){
-        e.preventDefault();
-        Swal.fire('Atención','Agrega al menos un material con cantidad válida.','warning');
-        return;
-    }
-    // Confirmar
     e.preventDefault();
+    const total=Object.keys(matsReq).length;
+    if(total===0){
+        Swal.fire('Atención','Agrega al menos un material.','warning'); return;
+    }
+    const nombres=Object.values(matsReq).slice(0,3).map(m=>m.nombre).join(', ')
+                  +(total>3?'...':'');
     Swal.fire({
         title:'¿Registrar requerimiento?',
-        text:`Se descontará stock de ${validas.length} material(es).`,
-        icon:'question',
-        showCancelButton:true,
-        confirmButtonColor:'#3b82f6',
-        cancelButtonColor:'#64748b',
-        confirmButtonText:'Sí, registrar',
+        html:`<div style="font-size:13px;">
+                <p class="mb-2">Se solicitarán <strong>${total}</strong> material(es):</p>
+                <p class="text-secondary mb-0">${nombres}</p>
+              </div>`,
+        icon:'question',showCancelButton:true,
+        confirmButtonColor:'#3b82f6',cancelButtonColor:'#64748b',
+        confirmButtonText:'<i class="fa-solid fa-floppy-disk me-1"></i>Sí, registrar',
         cancelButtonText:'Revisar'
     }).then(r=>{ if(r.isConfirmed) document.getElementById('formReq').submit(); });
 });
@@ -713,5 +682,37 @@ function usarPlantilla(reqId) {
     window.location.href = BASE_URL + '/pages/plantillas.php?tab=word&req_id=' + reqId;
 }
 </script>
+
+<style>
+/* Cards de materiales en Requerimiento — estilo azul */
+.mat-req-item {
+    display:flex; align-items:center; gap:12px;
+    background:rgba(59,130,246,0.06);
+    border:1px solid rgba(59,130,246,0.2);
+    border-radius:14px; padding:12px 16px;
+    margin-bottom:8px; transition:.2s;
+    animation:slideReq .2s ease;
+}
+.mat-req-item:hover { background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.35); }
+@keyframes slideReq {
+    from{opacity:0;transform:translateY(-5px);}
+    to  {opacity:1;transform:translateY(0);}
+}
+.mat-req-icon {
+    width:40px;height:40px;border-radius:12px;flex-shrink:0;
+    background:rgba(59,130,246,0.15);
+    display:flex;align-items:center;justify-content:center;
+    color:#60a5fa;font-size:15px;
+}
+.cant-req-input {
+    width:80px;text-align:center;
+    background:#0f172a;border:1px solid #334155;
+    color:white;border-radius:10px;padding:6px 8px;
+    font-size:13px;font-weight:600;
+}
+.cant-req-input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,0.15);}
+body.light-mode .mat-req-item{background:rgba(59,130,246,0.04);}
+body.light-mode .cant-req-input{background:#f8fafc;color:#0f172a;border-color:#cbd5e1;}
+</style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
