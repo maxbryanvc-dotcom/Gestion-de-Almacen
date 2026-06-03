@@ -489,6 +489,81 @@ function menuActivo(string $pagina): string {
         ::-webkit-scrollbar-track { background:rgba(0,0,0,0.1); }
         ::-webkit-scrollbar-thumb { background:#334155; border-radius:10px; }
         ::-webkit-scrollbar-thumb:hover { background:#475569; }
+
+        /* ═══ DROPDOWN DE BÚSQUEDA DE MATERIALES (global) ═══ */
+        /* Aplica en: Salidas, Reingresos, OTs y cualquier módulo con buscar material */
+
+        .drop-container {
+            background:#1e293b;
+            border:1px solid #334155;
+            border-radius:14px;
+            box-shadow:0 12px 36px rgba(0,0,0,0.35);
+            overflow:hidden;
+            margin-top:4px;
+        }
+        .drop-item {
+            display:flex; align-items:center; gap:12px;
+            padding:11px 14px; cursor:pointer;
+            border-bottom:1px solid rgba(255,255,255,0.05);
+            border-left:3px solid transparent;
+            transition:background .15s, border-left-color .15s;
+        }
+        .drop-item:last-child { border-bottom:none; }
+        .drop-item:hover, .drop-item.ac-active {
+            background:rgba(59,130,246,0.14);
+            border-left-color:#3b82f6;
+        }
+        .di-icon {
+            width:34px; height:34px; border-radius:9px; flex-shrink:0;
+            background:rgba(59,130,246,0.12);
+            display:flex; align-items:center; justify-content:center;
+            color:#60a5fa; font-size:13px; transition:background .15s;
+        }
+        .drop-item:hover .di-icon { background:rgba(59,130,246,0.25); }
+        .drop-item-nombre {
+            font-size:13px; font-weight:600; color:#f1f5f9;
+        }
+        .drop-item-meta { font-size:11px; color:#94a3b8; margin-top:1px; }
+        .drop-stock {
+            font-size:11px; font-weight:700; padding:3px 10px;
+            border-radius:20px; white-space:nowrap;
+            margin-left:auto; flex-shrink:0;
+        }
+        .drop-stock.verde    { background:rgba(34,197,94,0.15);  color:#22c55e; border:1px solid rgba(34,197,94,0.2); }
+        .drop-stock.amarillo { background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.2); }
+        .drop-stock.rojo     { background:rgba(239,68,68,0.15);  color:#ef4444; border:1px solid rgba(239,68,68,0.2); }
+
+        /* ── MODO CLARO ── */
+        body.light-mode .drop-container {
+            background:#ffffff !important;
+            border-color:#d1d5db !important;
+            box-shadow:0 8px 28px rgba(0,0,0,0.10) !important;
+        }
+        body.light-mode .drop-item {
+            border-bottom-color:#f1f5f9;
+        }
+        body.light-mode .drop-item:hover,
+        body.light-mode .drop-item.ac-active {
+            background:rgba(59,130,246,0.07);
+            border-left-color:#3b82f6;
+        }
+        body.light-mode .di-icon {
+            background:rgba(59,130,246,0.1);
+            color:#2563eb;
+        }
+        body.light-mode .drop-item:hover .di-icon {
+            background:rgba(59,130,246,0.2);
+        }
+        /* CRÍTICO: texto visible en fondo blanco */
+        body.light-mode .drop-item-nombre {
+            color:#111827 !important;
+        }
+        body.light-mode .drop-item-meta {
+            color:#6b7280 !important;
+        }
+        body.light-mode .drop-stock.verde    { background:rgba(34,197,94,0.1);  color:#15803d; }
+        body.light-mode .drop-stock.amarillo { background:rgba(245,158,11,0.1); color:#b45309; }
+        body.light-mode .drop-stock.rojo     { background:rgba(239,68,68,0.1);  color:#dc2626; }
     </style>
 </head>
 <body>

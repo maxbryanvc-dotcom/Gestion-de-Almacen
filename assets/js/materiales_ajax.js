@@ -1,6 +1,7 @@
 // ============================================================
 // JS compartido: filas dinámicas con AJAX para materiales
-// Usado en: salida_material.php y reingreso_material.php
+// Usado en: salida_material.php (y otros módulos con tabla)
+// CSS: ver .drop-container, .drop-item, etc. en layout.php
 // ============================================================
 
 let filaIdx = 0;
@@ -16,10 +17,10 @@ function agregarFila(tbodyId) {
             <div style="position:relative;">
                 <input type="text" class="form-control form-control-sm inp-buscar"
                        placeholder="Buscar material..." autocomplete="off">
-                <div class="ac-list" id="ac-${idx}"
-                     style="display:none;position:absolute;z-index:9999;background:#1e293b;
-                            border:1px solid #334155;border-radius:10px;width:100%;
-                            max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3);"></div>
+                <!-- Usa clase drop-container para tener estilos light/dark correctos -->
+                <div class="drop-container" id="ac-${idx}" style="display:none;
+                     position:absolute;z-index:9999;width:100%;max-height:220px;
+                     overflow-y:auto;margin-top:3px;"></div>
             </div>
         </td>
         <td><span class="inp-cod text-secondary" style="font-size:11px;">—</span></td>
@@ -46,17 +47,14 @@ function actualizarBtn(tbodyId) {
     if (!tbody) return;
     const filas = tbody.children.length;
 
-    // Ocultar/mostrar mensaje de "sin filas"
     const sinFilasId = tbodyId === 'tbodySalida' ? 'sinFilasSalida' : 'sinFilasReingreso';
     const el = document.getElementById(sinFilasId);
     if (el) el.style.display = filas === 0 ? 'block' : 'none';
 
-    // Habilitar/deshabilitar botón guardar
     const btnId = tbodyId === 'tbodySalida' ? 'btnGuardarSalida' : 'btnGuardarReingreso';
     const validas = [...tbody.querySelectorAll('.fila-mat')].filter(tr => {
-        const id   = tr.querySelector('.inp-id').value;
-        const cant = parseFloat(tr.querySelector('.inp-cant').value) || 0;
-        return id > 0 && cant > 0;
+        return tr.querySelector('.inp-id').value > 0 &&
+               parseFloat(tr.querySelector('.inp-cant').value) > 0;
     });
     const btn = document.getElementById(btnId);
     if (btn) btn.disabled = validas.length === 0;
@@ -77,23 +75,27 @@ function iniciarAC(tr, idx, tbodyId) {
                 .then(r => r.json())
                 .then(data => {
                     lista.innerHTML = '';
-                    if (!data.length) { lista.style.display = 'none'; return; }
+                    if (!data.length) {
+                        lista.innerHTML = '<div class="drop-item"><span class="drop-item-nombre" style="opacity:.5;">Sin resultados</span></div>';
+                        lista.style.display = 'block';
+                        return;
+                    }
                     data.forEach(m => {
+                        const stockCls = m.stock <= 0 ? 'rojo' : (m.stock <= 5 ? 'amarillo' : 'verde');
                         const div = document.createElement('div');
-                        div.style.cssText = 'padding:9px 14px;cursor:pointer;font-size:13px;' +
-                            'display:flex;justify-content:space-between;align-items:center;' +
-                            'border-bottom:1px solid rgba(255,255,255,0.06);transition:background .15s;';
-                        const sc = m.stock <= 0 ? '#ef4444' : (m.stock <= 5 ? '#f59e0b' : '#22c55e');
+                        div.className = 'drop-item';
                         div.innerHTML = `
-                            <div>
-                                <div style="font-weight:500;">${m.nombre}</div>
-                                <div style="font-size:10px;color:#64748b;">${m.codigo || ''} · ${m.unidad}</div>
+                            <div class="di-icon">
+                                <i class="fa-solid fa-box"></i>
                             </div>
-                            <span style="color:${sc};font-size:11px;font-weight:700;white-space:nowrap;">
-                                Stock: ${m.stock}
-                            </span>`;
-                        div.addEventListener('mouseenter', () => div.style.background = 'rgba(59,130,246,0.18)');
-                        div.addEventListener('mouseleave', () => div.style.background = '');
+                            <div style="flex:1;min-width:0;">
+                                <div class="drop-item-nombre">${m.nombre}</div>
+                                <div class="drop-item-meta">
+                                    ${m.codigo ? '<span class="me-2">' + m.codigo + '</span>' : ''}
+                                    <span>${m.unidad}</span>
+                                </div>
+                            </div>
+                            <span class="drop-stock ${stockCls}">Stock: ${m.stock}</span>`;
                         div.addEventListener('click', () => seleccionar(m, tr, lista, tbodyId));
                         lista.appendChild(div);
                     });
@@ -109,16 +111,18 @@ function iniciarAC(tr, idx, tbodyId) {
 
     // Navegación con teclado
     inp.addEventListener('keydown', e => {
-        const items = lista.querySelectorAll('div');
-        const active = lista.querySelector('.ac-active');
-        let idx = active ? [...items].indexOf(active) : -1;
+        const items = [...lista.querySelectorAll('.drop-item')];
+        const idx   = items.findIndex(el => el.classList.contains('ac-active'));
         if (e.key === 'ArrowDown') {
-            idx = Math.min(idx + 1, items.length - 1);
-            items.forEach((el, i) => el.classList.toggle('ac-active', i === idx));
+            const next = Math.min(idx + 1, items.length - 1);
+            items.forEach((el, i) => el.classList.toggle('ac-active', i === next));
             e.preventDefault();
         } else if (e.key === 'ArrowUp') {
-            idx = Math.max(idx - 1, 0);
-            items.forEach((el, i) => el.classList.toggle('ac-active', i === idx));
+            const prev = Math.max(idx - 1, 0);
+            items.forEach((el, i) => el.classList.toggle('ac-active', i === prev));
+            e.preventDefault();
+        } else if (e.key === 'Enter' && idx >= 0) {
+            items[idx].click();
             e.preventDefault();
         } else if (e.key === 'Escape') {
             lista.style.display = 'none';
@@ -149,7 +153,7 @@ function seleccionar(m, tr, lista, tbodyId) {
     c.oninput = () => {
         const v = parseFloat(c.value) || 0;
         if (v > m.stock) c.value = m.stock;
-        c.style.borderColor = v > m.stock ? '#ef4444' : '';
+        c.style.borderColor = v <= 0 ? '#ef4444' : '';
         actualizarBtn(tbodyId);
     };
 
