@@ -52,30 +52,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
     $filas_validas = [];
     $errores_stock = [];
 
+    // El requerimiento es una SOLICITUD A ELECTROSU ESTE — NO descuenta stock
+    // Solo registra qué materiales se están pidiendo y en qué cantidad
     foreach ($material_ids as $k => $mid) {
         $mid  = intval($mid);
         $cant = intval($cantidades[$k] ?? 0);
         if ($mid <= 0 || $cant <= 0) continue;
 
-        // Verificar stock real
-        $chk = $conn->prepare("SELECT nombre, stock FROM materiales WHERE id=? AND activo=1 LIMIT 1");
+        // Solo verificar que el material existe (sin validar stock)
+        $chk = $conn->prepare("SELECT nombre FROM materiales WHERE id=? AND activo=1 LIMIT 1");
         $chk->bind_param('i', $mid);
         $chk->execute();
         $mat = $chk->get_result()->fetch_assoc();
         $chk->close();
 
         if (!$mat) continue;
-        if ($cant > $mat['stock']) {
-            $errores_stock[] = "«{$mat['nombre']}»: solicitado $cant, disponible {$mat['stock']}";
-            continue;
-        }
         $filas_validas[] = ['id' => $mid, 'cant' => $cant, 'nombre' => $mat['nombre']];
     }
 
-    if (!empty($errores_stock)) {
-        $msg = 'Stock insuficiente en: ' . implode('; ', $errores_stock);
-        $tipo_msg = 'error';
-    } elseif (empty($filas_validas)) {
+    if (empty($filas_validas)) {
         $msg = 'Agrega al menos un material con cantidad válida.';
         $tipo_msg = 'error';
     } else {
@@ -94,26 +89,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'crear
             $req_id = $conn->insert_id;
             $stmtR->close();
 
+            // Solo guardar el detalle — SIN tocar el stock
             $stmtD = $conn->prepare(
                 "INSERT INTO detalle_requerimiento (requerimiento_id, material_id, cantidad) VALUES (?,?,?)"
             );
-            $stmtS = $conn->prepare("UPDATE materiales SET stock = stock - ? WHERE id = ?");
 
             foreach ($filas_validas as $fv) {
-                // Detalle
                 $stmtD->bind_param('iii', $req_id, $fv['id'], $fv['cant']);
                 $stmtD->execute();
-                // Descontar stock
-                $stmtS->bind_param('ii', $fv['cant'], $fv['id']);
-                $stmtS->execute();
-                // Historial
-                $conn->prepare("INSERT INTO historial (tipo, material_id, usuario, fecha) VALUES ('REQUERIMIENTO',?,?,NOW())")
-                     ->bind_param('is', $fv['id'], $usuario) && true;
-                $stmtH = $conn->prepare("INSERT INTO historial (tipo, material_id, usuario, fecha) VALUES ('REQUERIMIENTO',?,?,NOW())");
-                $stmtH->bind_param('is', $fv['id'], $usuario);
-                $stmtH->execute(); $stmtH->close();
             }
-            $stmtD->close(); $stmtS->close();
+            $stmtD->close();
 
             audit_log($conn, 'CREAR_REQUERIMIENTO', "Código: $codigo, ID: $req_id, ítems: " . count($filas_validas));
 
@@ -271,7 +256,7 @@ require_once __DIR__ . '/../includes/layout.php';
             </div>
             <small class="text-secondary mt-1 d-block" style="font-size:11px;">
                 <i class="fa-solid fa-circle-info me-1"></i>
-                Agrega todos los materiales que necesitas pedir a ElectroSur Este.
+                Agrega los materiales que necesitas pedir a ElectroSur Este. Puedes solicitar cualquier cantidad — el stock no se modifica aquí.
             </small>
         </div>
 
@@ -623,12 +608,16 @@ document.getElementById('formReq').addEventListener('submit', function(e){
     Swal.fire({
         title:'¿Registrar requerimiento?',
         html:`<div style="font-size:13px;">
-                <p class="mb-2">Se solicitarán <strong>${total}</strong> material(es):</p>
-                <p class="text-secondary mb-0">${nombres}</p>
+                <p class="mb-2">Se generará la carta pedido con <strong>${total}</strong> material(es):</p>
+                <p class="text-secondary mb-1">${nombres}</p>
+                <p class="mb-0" style="color:#60a5fa;font-size:11px;">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    No se modifica el stock. El stock aumenta cuando ElectroSur entregue los materiales (Entradas).
+                </p>
               </div>`,
         icon:'question',showCancelButton:true,
         confirmButtonColor:'#3b82f6',cancelButtonColor:'#64748b',
-        confirmButtonText:'<i class="fa-solid fa-floppy-disk me-1"></i>Sí, registrar',
+        confirmButtonText:'<i class="fa-solid fa-file-lines me-1"></i>Generar Requerimiento',
         cancelButtonText:'Revisar'
     }).then(r=>{ if(r.isConfirmed) document.getElementById('formReq').submit(); });
 });
