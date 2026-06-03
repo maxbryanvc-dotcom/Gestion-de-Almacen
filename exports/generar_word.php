@@ -84,42 +84,36 @@ $processor->saveAs($tmpFile1);
 // placeholder con TODAS las filas de materiales reales
 
 // XML de una fila de datos con la fuente Tahoma
+// Columnas: ITEM | CODIGO | ARTICULO | UNIDAD | CANTIDAD
+// Anchos:    600  | 1500   | 4326     | 1300   | 1300
 function filaXML(int $n, string $nombre, string $codigo, string $unidad, $cantidad): string {
     $bgFila = ($n % 2 === 0) ? 'EBF0FA' : 'FFFFFF';
+    $f = '<w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/>';
+    $shd = '<w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/>';
     return '<w:tr>
-      <w:tc><w:tcPr><w:tcW w:w="500" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+      <w:tc><w:tcPr><w:tcW w:w="600" w:type="dxa"/>'.$shd.'</w:tcPr>
         <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
-          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
-            <w:t>'.xmlEsc((string)$n).'</w:t>
-          </w:r>
+          <w:r><w:rPr>'.$f.'</w:rPr><w:t>'.xmlEsc((string)$n).'</w:t></w:r>
         </w:p>
       </w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="4826" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+      <w:tc><w:tcPr><w:tcW w:w="1500" w:type="dxa"/>'.$shd.'</w:tcPr>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
+          <w:r><w:rPr>'.$f.'</w:rPr><w:t>'.xmlEsc($codigo).'</w:t></w:r>
+        </w:p>
+      </w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="4326" w:type="dxa"/>'.$shd.'</w:tcPr>
         <w:p>
-          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
-            <w:t>'.xmlEsc($nombre).'</w:t>
-          </w:r>
+          <w:r><w:rPr>'.$f.'</w:rPr><w:t>'.xmlEsc($nombre).'</w:t></w:r>
         </w:p>
       </w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="1300" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+      <w:tc><w:tcPr><w:tcW w:w="1300" w:type="dxa"/>'.$shd.'</w:tcPr>
         <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
-          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
-            <w:t>'.xmlEsc($codigo).'</w:t>
-          </w:r>
+          <w:r><w:rPr>'.$f.'</w:rPr><w:t>'.xmlEsc($unidad).'</w:t></w:r>
         </w:p>
       </w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+      <w:tc><w:tcPr><w:tcW w:w="1300" w:type="dxa"/>'.$shd.'</w:tcPr>
         <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
-          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
-            <w:t>'.xmlEsc($unidad).'</w:t>
-          </w:r>
-        </w:p>
-      </w:tc>
-      <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
-        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
-          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
-            <w:t>'.xmlEsc((string)$cantidad).'</w:t>
-          </w:r>
+          <w:r><w:rPr>'.$f.'</w:rPr><w:t>'.xmlEsc((string)$cantidad).'</w:t></w:r>
         </w:p>
       </w:tc>
     </w:tr>';
