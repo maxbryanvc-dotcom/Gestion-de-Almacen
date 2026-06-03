@@ -171,27 +171,50 @@ require_once __DIR__ . '/../includes/layout.php';
     </script>
     <?php endif; ?>
 
-    <!-- BOTÓN DE EXPORTACIÓN RÁPIDA tras crear -->
-    <?php if (isset($_SESSION['ultimo_req_id']) && $okKey === 'creado'): ?>
-    <div class="alert-card success mb-4">
-        <i class="fa-solid fa-check-circle" style="color:#22c55e;font-size:22px;flex-shrink:0;"></i>
-        <div class="d-flex align-items-center gap-3 flex-wrap w-100">
-            <div>
-                <strong><?= htmlspecialchars($_SESSION['ultimo_req_codigo']) ?></strong> registrado.
-                <span class="text-secondary ms-2">¿Generar documento?</span>
+    <!-- BANNER DE DESCARGA TRAS CREAR -->
+    <?php if (isset($_SESSION['ultimo_req_id']) && $okKey === 'creado'):
+        $reqId     = $_SESSION['ultimo_req_id'];
+        $reqCodigo = $_SESSION['ultimo_req_codigo'];
+    ?>
+    <div class="mb-4" style="background:linear-gradient(135deg,#1e3a5f,#1e293b);
+         border:1px solid rgba(59,130,246,0.3);border-radius:20px;padding:24px;">
+        <div class="d-flex align-items-start gap-4 flex-wrap">
+
+            <!-- Ícono y texto -->
+            <div style="width:52px;height:52px;border-radius:14px;background:rgba(34,197,94,0.15);
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fa-solid fa-circle-check fa-xl" style="color:#22c55e;"></i>
             </div>
-            <div class="ms-auto d-flex gap-2">
-                <a href="<?= BASE_URL ?>/exports/generar_word.php?id=<?= $_SESSION['ultimo_req_id'] ?>"
-                   class="btn btn-primary btn-sm btn-custom">
-                    <i class="fa-solid fa-file-word me-1"></i>Word
+            <div style="flex:1;min-width:200px;">
+                <h5 class="fw-bold mb-1" style="color:white;">
+                    Requerimiento registrado correctamente
+                </h5>
+                <p class="mb-0" style="color:#94a3b8;font-size:13px;">
+                    <strong style="color:#60a5fa;"><?= htmlspecialchars($reqCodigo) ?></strong>
+                    — Ahora genera la Carta Pedido para enviar a ElectroSur Este.
+                </p>
+            </div>
+
+            <!-- Botones de descarga -->
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <a href="<?= BASE_URL ?>/exports/generar_word.php?id=<?= $reqId ?>"
+                   class="btn btn-primary btn-custom"
+                   style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;
+                          box-shadow:0 4px 14px rgba(37,99,235,0.4);">
+                    <i class="fa-solid fa-file-word me-2"></i>
+                    Descargar Carta Word
                 </a>
-                <a href="<?= BASE_URL ?>/exports/generar_pdf.php?id=<?= $_SESSION['ultimo_req_id'] ?>"
-                   class="btn btn-danger btn-sm btn-custom">
-                    <i class="fa-solid fa-file-pdf me-1"></i>PDF
+                <a href="<?= BASE_URL ?>/exports/generar_pdf.php?id=<?= $reqId ?>"
+                   class="btn btn-custom"
+                   style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);
+                          color:#fca5a5;">
+                    <i class="fa-solid fa-file-pdf me-2"></i>PDF
                 </a>
-                <a href="<?= BASE_URL ?>/pages/ver_requerimiento.php?id=<?= $_SESSION['ultimo_req_id'] ?>"
-                   class="btn btn-secondary btn-sm btn-custom" target="_blank">
-                    <i class="fa-solid fa-eye me-1"></i>Ver detalle
+                <a href="<?= BASE_URL ?>/pages/ver_requerimiento.php?id=<?= $reqId ?>"
+                   class="btn btn-custom" target="_blank"
+                   style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+                          color:#94a3b8;">
+                    <i class="fa-solid fa-eye me-2"></i>Ver detalle
                 </a>
             </div>
         </div>
