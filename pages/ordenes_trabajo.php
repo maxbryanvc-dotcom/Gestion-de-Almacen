@@ -325,41 +325,49 @@ require_once __DIR__ . '/../includes/layout.php';
 
         <!-- Materiales usados en la OT -->
         <div class="mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <label class="form-label mb-0 fw-semibold">
-                    <i class="fa-solid fa-boxes-stacked me-1 text-success"></i>
-                    Materiales utilizados
-                    <small class="text-secondary fw-normal ms-1">(opcional)</small>
-                </label>
-                <button type="button" class="btn btn-success btn-sm btn-custom" onclick="agregarFilaOT()">
-                    <i class="fa-solid fa-plus me-1"></i>Agregar material
+            <label class="form-label fw-semibold">
+                <i class="fa-solid fa-magnifying-glass me-1 text-success"></i>
+                Materiales utilizados
+                <small class="text-secondary fw-normal ms-1">(opcional)</small>
+            </label>
+            <div class="d-flex gap-2 mb-1">
+                <div style="flex:1;position:relative;">
+                    <input type="text" id="buscadorOT" class="form-control"
+                           placeholder="Escribe el nombre del material para agregarlo..."
+                           autocomplete="off">
+                    <div id="dropdownOT" class="drop-container"
+                         style="display:none;position:absolute;top:100%;left:0;right:0;
+                                z-index:9999;max-height:220px;overflow-y:auto;margin-top:4px;">
+                    </div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-custom"
+                        onclick="document.getElementById('buscadorOT').value='';
+                                 document.getElementById('dropdownOT').style.display='none';">
+                    <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-
-            <div class="table-responsive">
-                <table class="table align-middle" style="table-layout:fixed;">
-                    <colgroup>
-                        <col style="width:42%"><col style="width:13%">
-                        <col style="width:11%"><col style="width:22%">
-                        <col style="width:8%"> <col style="width:4%">
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th>Material</th><th>Código</th>
-                            <th>Stock</th><th>Cantidad usada</th>
-                            <th>Unidad</th><th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbodyMats"></tbody>
-                </table>
-            </div>
-            <p id="sinMats" class="text-secondary text-center py-2" style="display:none;font-size:13px;">
+            <small class="text-secondary d-block mb-3" style="font-size:11px;">
                 <i class="fa-solid fa-circle-info me-1"></i>
-                Sin materiales — la OT se registrará sin consumo de stock
-            </p>
+                Si no usas materiales, deja este campo vacío y guarda igual.
+            </small>
+
+            <!-- Cards de materiales seleccionados -->
+            <div id="listaMatsOT"></div>
+
+            <div id="sinMats" class="text-center py-3"
+                 style="border:2px dashed rgba(99,102,241,0.2);border-radius:14px;">
+                <i class="fa-solid fa-boxes-stacked fa-2x mb-2"
+                   style="color:rgba(99,102,241,0.25);"></i>
+                <p class="text-secondary mb-0" style="font-size:12px;">
+                    Sin materiales — la OT se registrará sin consumo de stock
+                </p>
+            </div>
+
+            <!-- inputs ocultos para el POST -->
+            <div id="inputsOcultos"></div>
         </div>
 
-        <div class="d-flex justify-content-end gap-3">
+        <div class="d-flex justify-content-end gap-3 mt-2">
             <button type="button" onclick="cerrarForm()" class="btn btn-secondary btn-custom">
                 Cancelar
             </button>
@@ -623,93 +631,149 @@ function verMateriales(id, num){
     });
 }
 
-// ── Materiales de la OT — funciones propias (sin conflicto con materiales_ajax.js) ──
-let otFilaIdx = 0;   // nombre distinto para no chocar con filaIdx global
+// ── Materiales de OT — sistema de cards ──────────────────────
+const matsOT = {}; // {id: {id, nombre, codigo, unidad, stock, cant}}
+let timerOT  = null;
 
-function agregarFilaOT(){
-    const tbody = document.getElementById('tbodyMats');
-    const idx   = otFilaIdx++;
-    const tr    = document.createElement('tr');
-    tr.className = 'fila-mat';
-    tr.innerHTML = `
-        <td>
-            <input type="hidden" name="material_id[]" class="inp-id" value="">
-            <div style="position:relative;">
-                <input type="text" class="form-control form-control-sm inp-buscar"
-                       placeholder="Buscar material..." autocomplete="off">
-                <div class="drop-container" id="otac-${idx}"
-                     style="display:none;position:absolute;z-index:9999;
-                            top:100%;left:0;right:0;max-height:200px;overflow-y:auto;"></div>
-            </div>
-        </td>
-        <td><span class="inp-cod text-secondary" style="font-size:11px;">—</span></td>
-        <td><span class="inp-stk">—</span></td>
-        <td>
-            <input type="number" name="cantidad[]" class="form-control form-control-sm inp-cant"
-                   min="0.01" step="0.01" max="0" placeholder="0" disabled style="max-width:90px;">
-        </td>
-        <td><span class="inp-und text-secondary" style="font-size:11px;">—</span></td>
-        <td>
-            <button type="button" class="btn btn-danger btn-sm"
-                    onclick="this.closest('tr').remove();contarFilasOT()">
-                <i class="fa-solid fa-times"></i>
-            </button>
-        </td>`;
-    tbody.appendChild(tr);
-    iniciarACOT(tr, idx);
-    contarFilasOT();
-}
+// Buscador
+document.getElementById('buscadorOT').addEventListener('input', function(){
+    clearTimeout(timerOT);
+    const q   = this.value.trim();
+    const drop= document.getElementById('dropdownOT');
+    if(q.length < 1){ drop.style.display='none'; return; }
 
-function contarFilasOT(){
-    const n = document.getElementById('tbodyMats').children.length;
-    document.getElementById('sinMats').style.display = n===0?'block':'none';
-}
-
-function iniciarACOT(tr, idx){
-    const inp   = tr.querySelector('.inp-buscar');
-    const lista = document.getElementById('otac-'+idx);
-    let timer   = null;
-
-    inp.addEventListener('input', function(){
-        clearTimeout(timer);
-        const q = this.value.trim();
-        if(q.length < 1){ lista.style.display='none'; return; }
-        timer = setTimeout(()=>{
-            fetch(BASE_URL+'/api/buscar_material.php?q='+encodeURIComponent(q))
-            .then(r=>r.json()).then(data=>{
-                lista.innerHTML='';
-                if(!data.length){ lista.style.display='none'; return; }
-                data.forEach(m=>{
-                    const sc = m.stock<=0?'rojo':(m.stock<=5?'amarillo':'verde');
-                    const div = document.createElement('div');
-                    div.className = 'drop-item';
-                    div.innerHTML = `
-                        <div class="di-icon"><i class="fa-solid fa-box"></i></div>
-                        <div style="flex:1;min-width:0;">
-                            <div class="drop-item-nombre">${m.nombre}</div>
-                            <div class="drop-item-meta">${m.codigo||''} · ${m.unidad}</div>
+    timerOT = setTimeout(()=>{
+        fetch(BASE_URL+'/api/buscar_material.php?q='+encodeURIComponent(q))
+        .then(r=>r.json()).then(data=>{
+            drop.innerHTML='';
+            if(!data.length){
+                drop.innerHTML='<div class="drop-item"><span class="drop-item-nombre" style="opacity:.5;">Sin resultados</span></div>';
+                drop.style.display='block'; return;
+            }
+            data.forEach(m=>{
+                const yaEsta = !!matsOT[m.id];
+                const sc = m.stock<=0?'rojo':(m.stock<=5?'amarillo':'verde');
+                const div= document.createElement('div');
+                div.className='drop-item'+(yaEsta?' ac-active':'');
+                div.innerHTML=`
+                    <div class="di-icon" style="background:rgba(99,102,241,0.12);color:#818cf8;">
+                        <i class="fa-solid fa-box"></i>
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="drop-item-nombre">${m.nombre}
+                            ${yaEsta?'<span class="badge bg-primary ms-2" style="font-size:9px;">✓ Agregado</span>':''}
                         </div>
-                        <span class="drop-stock ${sc}">Stock: ${m.stock}</span>`;
-                    div.addEventListener('click',()=>seleccionarOT(m,tr,lista));
-                    lista.appendChild(div);
-                });
-                lista.style.display='block';
+                        <div class="drop-item-meta">${m.codigo||''} · ${m.unidad}</div>
+                    </div>
+                    <span class="drop-stock ${sc}">Stock: ${m.stock}</span>`;
+                if(!yaEsta){
+                    div.addEventListener('click',()=>{
+                        agregarMatOT(m);
+                        document.getElementById('buscadorOT').value='';
+                        drop.style.display='none';
+                    });
+                }
+                drop.appendChild(div);
             });
-        },280);
-    });
-    document.addEventListener('click', e=>{ if(!tr.contains(e.target)) lista.style.display='none'; });
+            drop.style.display='block';
+        });
+    },260);
+});
+
+document.addEventListener('click',e=>{
+    const inp =document.getElementById('buscadorOT');
+    const drop=document.getElementById('dropdownOT');
+    if(!inp.contains(e.target)&&!drop.contains(e.target)) drop.style.display='none';
+});
+
+function agregarMatOT(m){
+    if(matsOT[m.id]) return;
+    matsOT[m.id]={...m, cant:1};
+
+    const sc = m.stock<=5?'amarillo':'verde';
+    const div= document.createElement('div');
+    div.id   = 'otmat-'+m.id;
+    div.className='mat-ot-item';
+    div.innerHTML=`
+        <div class="mat-ot-icon"><i class="fa-solid fa-box"></i></div>
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;">${m.nombre}</div>
+            <div style="font-size:11px;color:#64748b;">
+                ${m.codigo?'<span class="me-2">'+m.codigo+'</span>':''}
+                <span>${m.unidad}</span>
+                <span class="drop-stock ${sc} ms-2" style="font-size:10px;">Disponible: ${m.stock}</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm"
+                    style="background:rgba(255,255,255,.06);border:none;color:#64748b;
+                           width:30px;height:30px;border-radius:8px;"
+                    onclick="cambiarCantOT(${m.id},-1,${m.stock})">
+                <i class="fa-solid fa-minus" style="font-size:10px;"></i>
+            </button>
+            <input type="number" class="cant-ot-input" id="cantot-${m.id}"
+                   value="1" min="0.01" step="0.01" max="${m.stock}"
+                   onchange="validarCantOT(${m.id},${m.stock})"
+                   oninput="validarCantOT(${m.id},${m.stock})">
+            <button type="button" class="btn btn-sm"
+                    style="background:rgba(255,255,255,.06);border:none;color:#64748b;
+                           width:30px;height:30px;border-radius:8px;"
+                    onclick="cambiarCantOT(${m.id},1,${m.stock})">
+                <i class="fa-solid fa-plus" style="font-size:10px;"></i>
+            </button>
+        </div>
+        <button type="button" class="btn btn-sm"
+                style="background:rgba(239,68,68,.1);border:none;color:#ef4444;
+                       width:34px;height:34px;border-radius:10px;flex-shrink:0;"
+                onclick="quitarMatOT(${m.id})">
+            <i class="fa-solid fa-xmark"></i>
+        </button>`;
+    document.getElementById('listaMatsOT').appendChild(div);
+    sincronizarInputsOcultos();
+    actualizarSinMats();
 }
 
-function seleccionarOT(m, tr, lista){
-    tr.querySelector('.inp-id').value         = m.id;
-    tr.querySelector('.inp-buscar').value     = m.nombre;
-    tr.querySelector('.inp-cod').textContent  = m.codigo||'—';
-    tr.querySelector('.inp-und').textContent  = m.unidad;
-    const bg = m.stock<=0?'danger':(m.stock<=5?'warning':(m.stock<=10?'info':'success'));
-    tr.querySelector('.inp-stk').innerHTML    = `<span class="badge bg-${bg}">${m.stock}</span>`;
-    const c = tr.querySelector('.inp-cant');
-    c.disabled = m.stock<=0; c.max = m.stock; c.value = m.stock>0?1:0;
-    lista.style.display='none';
+function cambiarCantOT(id, delta, max){
+    const inp=document.getElementById('cantot-'+id);
+    if(!inp) return;
+    let v=parseFloat(inp.value)||0;
+    v=Math.max(0.01,Math.min(v+delta,max));
+    inp.value=v; if(matsOT[id]) matsOT[id].cant=v;
+    sincronizarInputsOcultos();
+}
+
+function validarCantOT(id, max){
+    const inp=document.getElementById('cantot-'+id);
+    if(!inp) return;
+    let v=parseFloat(inp.value)||0;
+    if(v>max){inp.value=max;v=max;}
+    if(v<=0){inp.value=0.01;v=0.01;}
+    if(matsOT[id]) matsOT[id].cant=v;
+    sincronizarInputsOcultos();
+}
+
+function quitarMatOT(id){
+    delete matsOT[id];
+    const el=document.getElementById('otmat-'+id);
+    if(el){el.style.opacity='0';el.style.transform='translateX(8px)';
+           setTimeout(()=>el.remove(),180);}
+    sincronizarInputsOcultos();
+    actualizarSinMats();
+}
+
+function actualizarSinMats(){
+    const n=Object.keys(matsOT).length;
+    document.getElementById('sinMats').style.display=n===0?'block':'none';
+}
+
+// Sincroniza los inputs ocultos para el POST
+function sincronizarInputsOcultos(){
+    const cont=document.getElementById('inputsOcultos');
+    cont.innerHTML='';
+    Object.values(matsOT).forEach(m=>{
+        cont.innerHTML+=`<input type="hidden" name="material_id[]" value="${m.id}">
+                         <input type="hidden" name="cantidad[]" value="${m.cant}">`;
+    });
 }
 
 // ── Validación submit ────────────────────────────────────────
@@ -725,9 +789,35 @@ document.getElementById('formOT').addEventListener('submit',function(e){
 </script>
 
 <style>
-.autocomplete-list div:last-child{ border-bottom:none; }
-body.light-mode .autocomplete-list{ background:white!important; border-color:#e2e8f0!important; }
-body.light-mode .autocomplete-list div{ color:#0f172a!important; }
+/* Cards de materiales en OT — estilo índigo */
+.mat-ot-item {
+    display:flex; align-items:center; gap:12px;
+    background:rgba(99,102,241,0.06);
+    border:1px solid rgba(99,102,241,0.2);
+    border-radius:14px; padding:12px 16px;
+    margin-bottom:8px; transition:.2s;
+    animation:slideOT .2s ease;
+}
+.mat-ot-item:hover { background:rgba(99,102,241,0.1); border-color:rgba(99,102,241,0.35); }
+@keyframes slideOT {
+    from{opacity:0;transform:translateY(-5px);}
+    to  {opacity:1;transform:translateY(0);}
+}
+.mat-ot-icon {
+    width:40px;height:40px;border-radius:12px;flex-shrink:0;
+    background:rgba(99,102,241,0.15);
+    display:flex;align-items:center;justify-content:center;
+    color:#818cf8;font-size:15px;
+}
+.cant-ot-input {
+    width:80px;text-align:center;
+    background:#0f172a;border:1px solid #334155;
+    color:white;border-radius:10px;padding:6px 8px;
+    font-size:13px;font-weight:600;
+}
+.cant-ot-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.15);}
+body.light-mode .mat-ot-item{background:rgba(99,102,241,0.04);}
+body.light-mode .cant-ot-input{background:#f8fafc;color:#0f172a;border-color:#cbd5e1;}
 </style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
