@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 // GENERAR CARTA PEDIDO — usa la plantilla oficial CONSORCIO SAR
-// Solo reemplaza los marcadores con datos reales
+// Reemplaza marcadores de texto + genera tabla de materiales
 // ============================================================
 ob_start();
 error_reporting(0);
@@ -50,60 +50,168 @@ function fechaLarga(string $fecha): string {
     $t = strtotime($fecha);
     return date('j', $t) . ' de ' . $meses[(int)date('n', $t)] . ' del ' . date('Y', $t);
 }
-
 function mesAnio(string $fecha): string {
     $meses = ['01'=>'ENERO','02'=>'FEBRERO','03'=>'MARZO','04'=>'ABRIL',
               '05'=>'MAYO','06'=>'JUNIO','07'=>'JULIO','08'=>'AGOSTO',
               '09'=>'SEPTIEMBRE','10'=>'OCTUBRE','11'=>'NOVIEMBRE','12'=>'DICIEMBRE'];
-    $t  = strtotime($fecha);
-    $mm = date('m', $t);
-    $yy = date('Y', $t);
-    return 'PEDIDO DE MATERIALES ' . $meses[$mm] . ' ' . $yy;
+    $t = strtotime($fecha);
+    return 'PEDIDO DE MATERIALES ' . $meses[date('m',$t)] . ' ' . date('Y',$t);
+}
+function xmlEsc(string $s): string {
+    return htmlspecialchars($s, ENT_XML1 | ENT_COMPAT, 'UTF-8');
 }
 
-// ── Valores para reemplazar ───────────────────────────────────
-$fechaDoc     = fechaLarga($req['fecha'] ?? date('Y-m-d'));
-$numeroCarta  = $req['codigo_req'] ?? ('REQ-' . str_pad($id, 3, '0', STR_PAD_LEFT));
-$asunto       = mesAnio($req['fecha'] ?? date('Y-m-d'));
+$fechaDoc    = fechaLarga($req['fecha'] ?? date('Y-m-d'));
+$numeroCarta = $req['codigo_req'] ?? ('REQ-' . str_pad($id, 3, '0', STR_PAD_LEFT));
+$asunto      = mesAnio($req['fecha'] ?? date('Y-m-d'));
 
-// ── Usar TemplateProcessor con el archivo real ────────────────
+// ── PASO 1: Reemplazar textos con TemplateProcessor ───────────
+$tmpFile1 = tempnam(sys_get_temp_dir(), 'carta1_') . '.docx';
 $processor = new TemplateProcessor($templatePath);
-
-// Reemplazar marcadores de texto
 $processor->setValue('fecha_larga',  $fechaDoc);
 $processor->setValue('numero_carta', $numeroCarta);
 $processor->setValue('asunto',       $asunto);
+// Limpiar marcadores de la tabla (serán reemplazados en el paso 2)
+$processor->setValue('item_num',     '');
+$processor->setValue('mat_nombre',   '');
+$processor->setValue('mat_codigo',   '');
+$processor->setValue('mat_unidad',   '');
+$processor->setValue('mat_cantidad', '');
+$processor->saveAs($tmpFile1);
 
-// Clonar la fila de materiales por cada ítem
-if (!empty($detalles)) {
-    try {
-        $processor->cloneRow('mat_nombre', count($detalles));
-        foreach ($detalles as $i => $d) {
-            $n = $i + 1;
-            $processor->setValue("item_num#$n",     $n);
-            $processor->setValue("mat_nombre#$n",   $d['nombre']);
-            $processor->setValue("mat_codigo#$n",   $d['codigo'] ?? '');
-            $processor->setValue("mat_unidad#$n",   $d['unidad']);
-            $processor->setValue("mat_cantidad#$n", $d['cantidad']);
-        }
-    } catch (\Exception $e) {
-        // Si falla el cloneRow, reemplazar directamente (un solo material)
-        $processor->setValue('item_num',     1);
-        $processor->setValue('mat_nombre',   $detalles[0]['nombre'] ?? '');
-        $processor->setValue('mat_codigo',   $detalles[0]['codigo'] ?? '');
-        $processor->setValue('mat_unidad',   $detalles[0]['unidad'] ?? '');
-        $processor->setValue('mat_cantidad', $detalles[0]['cantidad'] ?? '');
-    }
-} else {
-    // Sin materiales — limpiar marcadores
-    foreach (['item_num','mat_nombre','mat_codigo','mat_unidad','mat_cantidad'] as $k) {
-        $processor->setValue($k, '');
+// ── PASO 2: Inyectar tabla de materiales directamente en el XML ─
+// Abre el docx como ZIP, lee document.xml, reemplaza la fila
+// placeholder con TODAS las filas de materiales reales
+
+// XML de una fila de datos con la fuente Tahoma
+function filaXML(int $n, string $nombre, string $codigo, string $unidad, $cantidad): string {
+    $bgFila = ($n % 2 === 0) ? 'EBF0FA' : 'FFFFFF';
+    return '<w:tr>
+      <w:tc><w:tcPr><w:tcW w:w="500" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
+          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+            <w:t>'.xmlEsc((string)$n).'</w:t>
+          </w:r>
+        </w:p>
+      </w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="4826" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+        <w:p>
+          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+            <w:t>'.xmlEsc($nombre).'</w:t>
+          </w:r>
+        </w:p>
+      </w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="1300" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
+          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+            <w:t>'.xmlEsc($codigo).'</w:t>
+          </w:r>
+        </w:p>
+      </w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
+          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+            <w:t>'.xmlEsc($unidad).'</w:t>
+          </w:r>
+        </w:p>
+      </w:tc>
+      <w:tc><w:tcPr><w:tcW w:w="1200" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="'.$bgFila.'"/></w:tcPr>
+        <w:p><w:pPr><w:jc w:val="center"/></w:pPr>
+          <w:r><w:rPr><w:rFonts w:ascii="Tahoma" w:hAnsi="Tahoma" w:cs="Tahoma"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr>
+            <w:t>'.xmlEsc((string)$cantidad).'</w:t>
+          </w:r>
+        </w:p>
+      </w:tc>
+    </w:tr>';
+}
+
+// Construir TODAS las filas de materiales
+$filasXML = '';
+foreach ($detalles as $i => $d) {
+    $filasXML .= filaXML(
+        $i + 1,
+        $d['nombre'],
+        $d['codigo'] ?? '',
+        $d['unidad'],
+        $d['cantidad']
+    );
+}
+
+// Leer el docx temporal como ZIP y modificar document.xml
+$tmpFile2 = tempnam(sys_get_temp_dir(), 'carta2_') . '.docx';
+$zip = new ZipArchive();
+$zip->open($tmpFile1);
+$docXml = $zip->getFromName('word/document.xml');
+$zip->close();
+
+// La fila placeholder (con las celdas vacías después del setValue '') tiene este patrón:
+// Buscar la fila <w:tr> que contiene las celdas de la tabla de materiales (la que
+// tiene las celdas vacías y está después de la fila de cabecera azul)
+// Usamos regex para encontrar la fila de datos (la que sigue al encabezado)
+
+// Patrón: encontrar la fila de datos placeholder en la tabla de materiales
+// La fila tiene 5 celdas con el mismo estilo, después de la fila header (1F3864)
+// Buscamos la segunda <w:tr> en la segunda tabla (la tabla de materiales)
+
+// Estrategia: reemplazar la fila con <w:t></w:t> vacíos (placeholder limpio)
+// por las filas reales de materiales
+
+// La fila placeholder tiene las celdas vacías con fondo FFFFFF o EBF0FA
+$patronFilaVacia = '/<w:tr>\s*<w:tc>[^<]*<w:tcPr>[^<]*<w:tcW w:w="500"[^>]*\/>[^<]*<w:shd[^<]*1F3864[^<]*\/>[^<]*<\/w:tcPr>/';
+
+// Mejor estrategia: buscar la fila que NO tiene fondo 1F3864 en la segunda tabla
+// Dividir el XML en las dos tablas y procesar la segunda
+$partes = explode('<w:tblStyle w:val="Tablaconcuadrcula"', $docXml);
+
+if (count($partes) >= 2) {
+    // La primera tabla es Controlling, la segunda es materiales
+    // En la segunda tabla, reemplazar la fila de datos (no la de cabecera)
+    // La fila de datos es la que NO tiene fill="1F3864"
+
+    // Encontrar la tabla de materiales completa en el XML
+    // y reemplazar su fila de datos con las filas reales
+    $xmlNuevo = preg_replace_callback(
+        // Busca la segunda <w:tbl> (la de materiales) y dentro reemplaza la fila de datos
+        '/(<w:tbl>(?:(?!<w:tbl>).)*?1F3864(?:(?!<w:tbl>).)*?)(<w:tr>(?:(?!1F3864).)*?<\/w:tr>)(\s*<\/w:tbl>)/s',
+        function($m) use ($filasXML) {
+            return $m[1] . $filasXML . $m[3];
+        },
+        $docXml
+    );
+
+    // Si el regex funcionó, usar el XML nuevo; si no, intentar con un patrón más simple
+    if ($xmlNuevo && $xmlNuevo !== $docXml) {
+        $docXml = $xmlNuevo;
+    } else {
+        // Estrategia alternativa: buscar la fila con celdas de ancho 500 sin fondo 1F3864
+        $docXml = preg_replace(
+            '/<w:tr>\s*<w:tc>\s*<w:tcPr>\s*<w:tcW w:w="500"[^>]*\/>\s*<\/w:tcPr>.*?<\/w:tr>/s',
+            $filasXML,
+            $docXml,
+            1  // Solo la primera ocurrencia (la fila de datos de la tabla de materiales)
+        );
     }
 }
 
-// ── Guardar en archivo temporal y enviar ─────────────────────
-$tmpFile = tempnam(sys_get_temp_dir(), 'carta_') . '.docx';
-$processor->saveAs($tmpFile);
+// Guardar el docx modificado
+$zipOut = new ZipArchive();
+$zipOut->open($tmpFile2, ZipArchive::CREATE);
+$zipIn = new ZipArchive();
+$zipIn->open($tmpFile1);
+for ($i = 0; $i < $zipIn->numFiles; $i++) {
+    $name    = $zipIn->getNameIndex($i);
+    $content = $zipIn->getFromIndex($i);
+    if ($name === 'word/document.xml') {
+        $zipOut->addFromString($name, $docXml);
+    } else {
+        $zipOut->addFromString($name, $content);
+    }
+}
+$zipIn->close();
+$zipOut->close();
+
+// Limpiar archivo temporal intermedio
+@unlink($tmpFile1);
 
 audit_log($conn, 'GENERAR_WORD', "Carta pedido REQ ID $id: $numeroCarta");
 
@@ -112,9 +220,9 @@ $filename = 'CartaPedido_' . preg_replace('/[^A-Za-z0-9\-]/', '', $numeroCarta) 
 while (ob_get_level()) ob_end_clean();
 header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
-header('Content-Length: ' . filesize($tmpFile));
+header('Content-Length: ' . filesize($tmpFile2));
 header('Cache-Control: max-age=0');
 
-readfile($tmpFile);
-unlink($tmpFile);
+readfile($tmpFile2);
+unlink($tmpFile2);
 exit;
