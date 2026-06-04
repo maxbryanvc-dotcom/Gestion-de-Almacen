@@ -212,7 +212,7 @@ CONTENEDOR GENERAL
                         <!-- FECHA -->
                         <td>
 
-                            <?php echo date('d/m/Y H:i', strtotime($row['fecha'])); ?>
+                            <?php echo $row['fecha'] ? date('d/m/Y H:i', strtotime($row['fecha'])) : '—'; ?>
 
                         </td>
 
