@@ -497,4 +497,208 @@ function generarCodigo(){
 <?php endif; ?>
 </script>
 
+<script>
+// ============================================================
+// NOTIFICACIONES DE STOCK CON SONIDO
+// Se activan al cargar el dashboard si hay alertas
+// ============================================================
+
+// Datos del servidor
+const AGOTADOS   = <?= (int)$kpis['agotados'] ?>;
+const CRITICOS   = <?= (int)$kpis['stock_crit'] ?>;
+const STOCK_BAJO = <?= (int)$kpis['stock_bajo'] ?>;
+
+// Genera un sonido usando Web Audio API (sin archivos externos)
+function tonoAlerta(tipo) {
+    try {
+        const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (tipo === 'agotado') {
+            // Tono urgente: dos pitidos cortos descendentes
+            osc.type     = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.3);
+
+            // Segundo pitido
+            const osc2  = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2); gain2.connect(ctx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.4);
+            osc2.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.55);
+            gain2.gain.setValueAtTime(0.25, ctx.currentTime + 0.4);
+            gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+            osc2.start(ctx.currentTime + 0.4);
+            osc2.stop(ctx.currentTime + 0.7);
+
+        } else if (tipo === 'critico') {
+            // Tono de advertencia: un pitido suave
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(660, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(520, ctx.currentTime + 0.25);
+            gain.gain.setValueAtTime(0.18, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.4);
+
+        } else if (tipo === 'bajo') {
+            // Tono informativo: pitido suave breve
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(520, ctx.currentTime);
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.3);
+        }
+    } catch(e) {
+        // Web Audio API no disponible, silencioso
+    }
+}
+
+// Mostrar notificación toast con sonido
+function mostrarNotificacion(tipo, mensaje, color, icono) {
+    // Crear toast
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position:fixed; bottom:24px; right:24px; z-index:99999;
+        background:${color}; color:white;
+        padding:14px 20px; border-radius:14px;
+        box-shadow:0 8px 28px rgba(0,0,0,0.35);
+        display:flex; align-items:center; gap:12px;
+        font-size:13px; font-weight:600; font-family:Inter,Arial,sans-serif;
+        max-width:340px; cursor:pointer;
+        animation: slideInToast 0.4s ease;
+        border-left: 4px solid rgba(255,255,255,0.4);
+    `;
+    toast.innerHTML = `
+        <i class="fa-solid ${icono}" style="font-size:18px;flex-shrink:0;"></i>
+        <div>
+            <div style="font-weight:700;margin-bottom:2px;">Alerta de Stock</div>
+            <div style="font-weight:400;opacity:.9;font-size:12px;">${mensaje}</div>
+        </div>
+        <div style="margin-left:auto;opacity:.7;font-size:11px;">clic para cerrar</div>
+    `;
+    toast.onclick = () => {
+        toast.style.animation = 'slideOutToast 0.3s ease forwards';
+        setTimeout(() => toast.remove(), 300);
+    };
+
+    // Auto-cerrar después de 6 segundos
+    setTimeout(() => {
+        if(toast.parentNode) {
+            toast.style.animation = 'slideOutToast 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 6000);
+
+    document.body.appendChild(toast);
+
+    // Reproducir sonido
+    tonoAlerta(tipo);
+}
+
+// Animaciones CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInToast {
+        from { transform:translateX(120%); opacity:0; }
+        to   { transform:translateX(0);   opacity:1; }
+    }
+    @keyframes slideOutToast {
+        from { transform:translateX(0);   opacity:1; }
+        to   { transform:translateX(120%); opacity:0; }
+    }
+`;
+document.head.appendChild(style);
+
+// Disparar notificaciones al cargar (con pequeños retrasos para no solapar)
+document.addEventListener('DOMContentLoaded', () => {
+    // Solo mostrar si el usuario no las ha silenciado hoy
+    const hoy = new Date().toDateString();
+    const silenciado = localStorage.getItem('alertas_silenciadas');
+
+    if (silenciado === hoy) return; // Ya las vio hoy
+
+    let delay = 800;
+
+    if (AGOTADOS > 0) {
+        setTimeout(() => {
+            mostrarNotificacion(
+                'agotado',
+                `${AGOTADOS} material(es) SIN STOCK — requiere reposición urgente`,
+                'linear-gradient(135deg,#dc2626,#b91c1c)',
+                'fa-ban'
+            );
+        }, delay);
+        delay += 800;
+    }
+
+    if (CRITICOS > 0) {
+        setTimeout(() => {
+            mostrarNotificacion(
+                'critico',
+                `${CRITICOS} material(es) en stock CRÍTICO (≤5 unidades)`,
+                'linear-gradient(135deg,#d97706,#b45309)',
+                'fa-triangle-exclamation'
+            );
+        }, delay);
+        delay += 800;
+    }
+
+    if (STOCK_BAJO > 0 && (AGOTADOS > 0 || CRITICOS > 0)) {
+        setTimeout(() => {
+            mostrarNotificacion(
+                'bajo',
+                `${STOCK_BAJO} material(es) con stock bajo (≤10 unidades)`,
+                'linear-gradient(135deg,#0369a1,#0284c7)',
+                'fa-box-open'
+            );
+        }, delay);
+    }
+
+    // Botón para silenciar el resto del día
+    if (AGOTADOS > 0 || CRITICOS > 0) {
+        setTimeout(() => {
+            const btnSilenciar = document.createElement('div');
+            btnSilenciar.style.cssText = `
+                position:fixed; bottom:24px; left:24px; z-index:99999;
+                background:rgba(30,41,59,0.95); color:#94a3b8;
+                padding:10px 16px; border-radius:12px; cursor:pointer;
+                font-size:11px; font-family:Inter,Arial,sans-serif;
+                border:1px solid rgba(255,255,255,0.08);
+                box-shadow:0 4px 16px rgba(0,0,0,0.3);
+                animation: slideInToast 0.4s ease;
+                display:flex; align-items:center; gap:8px;
+            `;
+            btnSilenciar.innerHTML = `<i class="fa-solid fa-bell-slash"></i> Silenciar alertas de hoy`;
+            btnSilenciar.onclick = () => {
+                localStorage.setItem('alertas_silenciadas', new Date().toDateString());
+                btnSilenciar.style.animation = 'slideOutToast 0.3s ease forwards';
+                setTimeout(() => btnSilenciar.remove(), 300);
+                Swal.fire({
+                    title:'Alertas silenciadas',
+                    text:'No recibirás más notificaciones de stock por hoy.',
+                    icon:'info', timer:2500, showConfirmButton:false
+                });
+            };
+            document.body.appendChild(btnSilenciar);
+            setTimeout(() => {
+                if(btnSilenciar.parentNode){
+                    btnSilenciar.style.animation='slideOutToast 0.3s ease forwards';
+                    setTimeout(()=>btnSilenciar.remove(),300);
+                }
+            }, 8000);
+        }, delay + 400);
+    }
+});
+</script>
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
