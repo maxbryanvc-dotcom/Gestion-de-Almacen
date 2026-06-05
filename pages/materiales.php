@@ -146,19 +146,29 @@ $resultado = $conn->query($sql);
     </div>
     <div class="modal-body text-center">
 
-        <!-- Paso 1: Solicitar código al admin -->
+        <!-- Paso 1: Notificar al admin y esperar -->
         <div id="paso1">
             <div style="width:70px;height:70px;border-radius:20px;background:rgba(245,158,11,0.15);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
-                <i class="fa-solid fa-key fa-2x" style="color:#f59e0b;"></i>
+                <i class="fa-solid fa-bell fa-2x" style="color:#f59e0b;"></i>
             </div>
             <h6 class="fw-bold mb-2">Acción restringida</h6>
-            <p class="text-secondary mb-4" style="font-size:13px;">
-                Esta acción requiere autorización del administrador.<br>
-                Solicítale un código de acceso temporal.
+            <p class="text-secondary mb-3" style="font-size:13px;">
+                Esta acción requiere autorización del administrador.
             </p>
-            <button class="btn btn-warning btn-custom w-100 mb-3" onclick="mostrarPaso2()">
-                <i class="fa-solid fa-paper-plane me-2"></i>
-                Tengo el código del administrador
+            <!-- Estado de la solicitud -->
+            <div id="estadoSolicitud" style="display:none;"
+                 class="mb-3 p-3 rounded-3"
+                 style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);">
+                <i class="fa-solid fa-circle-check text-success me-2"></i>
+                <span id="textoEstado" style="font-size:13px;"></span>
+            </div>
+            <button class="btn btn-warning btn-custom w-100 mb-2" onclick="enviarSolicitud()" id="btnNotificar">
+                <i class="fa-solid fa-bell me-2"></i>
+                Notificar al Administrador
+            </button>
+            <button class="btn btn-primary btn-custom w-100 mb-2" onclick="mostrarPaso2()" id="btnTengoCode" style="display:none;">
+                <i class="fa-solid fa-key me-2"></i>
+                Ya tengo el código
             </button>
             <button type="button" class="btn btn-secondary btn-custom w-100" data-bs-dismiss="modal">
                 Cancelar
@@ -252,7 +262,48 @@ function solicitarPermiso(accion, id){
     new bootstrap.Modal(document.getElementById('modalPermiso')).show();
 }
 
-function mostrarPaso1(){ document.getElementById('paso1').style.display='block'; document.getElementById('paso2').style.display='none'; }
+function mostrarPaso1(){
+    document.getElementById('paso1').style.display='block';
+    document.getElementById('paso2').style.display='none';
+    // Resetear estado
+    document.getElementById('estadoSolicitud').style.display='none';
+    document.getElementById('btnTengoCode').style.display='none';
+    document.getElementById('btnNotificar').style.display='block';
+    document.getElementById('btnNotificar').disabled=false;
+    document.getElementById('btnNotificar').innerHTML='<i class="fa-solid fa-bell me-2"></i>Notificar al Administrador';
+}
+
+// Enviar solicitud de permiso al admin
+function enviarSolicitud(){
+    const btn = document.getElementById('btnNotificar');
+    btn.disabled=true;
+    btn.innerHTML='<i class="fa-solid fa-spinner fa-spin me-2"></i>Enviando...';
+
+    fetch(BASE_URL+'/api/solicitar_permiso.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`accion=crear&tipo=${_permisoAccion==='editar'?'Editar material':'Eliminar material'}&recurso_id=${_permisoRecurso}`
+    })
+    .then(r=>r.json())
+    .then(data=>{
+        if(data.ok){
+            const est = document.getElementById('estadoSolicitud');
+            est.style.display='block';
+            est.style.background='rgba(34,197,94,0.1)';
+            est.style.border='1px solid rgba(34,197,94,0.2)';
+            est.style.borderRadius='12px';
+            est.style.padding='12px';
+            document.getElementById('textoEstado').innerHTML=
+                '<i class="fa-solid fa-circle-check text-success me-2"></i>'+
+                '<strong>Solicitud enviada.</strong> El administrador recibio una alerta en su panel.';
+            btn.style.display='none';
+            document.getElementById('btnTengoCode').style.display='block';
+        } else {
+            btn.disabled=false;
+            btn.innerHTML='<i class="fa-solid fa-bell me-2"></i>Notificar al Administrador';
+        }
+    });
+}
 function mostrarPaso2(){ document.getElementById('paso1').style.display='none'; document.getElementById('paso2').style.display='block'; document.getElementById('inputCodigo').focus(); }
 
 function verificarPermiso(){

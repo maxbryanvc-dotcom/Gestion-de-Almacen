@@ -499,6 +499,144 @@ function generarCodigo(){
 
 <script>
 // ============================================================
+// ALERTAS DE SOLICITUDES DE PERMISO (solo Administrador)
+// Consulta cada 8 segundos si hay almaceneros esperando código
+// ============================================================
+<?php if(($_SESSION['rol']??'') === 'admin'): ?>
+(function(){
+    let solicitudesVistas = new Set();
+    let intervalSolicitudes = null;
+
+    function tonoSolicitud(){
+        try{
+            const ctx=new(window.AudioContext||window.webkitAudioContext)();
+            const osc=ctx.createOscillator(); const gain=ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type='sine';
+            osc.frequency.setValueAtTime(1047,ctx.currentTime);
+            osc.frequency.setValueAtTime(784,ctx.currentTime+0.15);
+            osc.frequency.setValueAtTime(1047,ctx.currentTime+0.3);
+            gain.gain.setValueAtTime(0.2,ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);
+            osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.5);
+        }catch(e){}
+    }
+
+    function mostrarAlertaSolicitud(sol){
+        // Evitar mostrar la misma alerta dos veces
+        if(solicitudesVistas.has(sol.id)) return;
+        solicitudesVistas.add(sol.id);
+
+        const hace = sol.segundos < 60
+            ? 'hace ' + sol.segundos + ' seg'
+            : 'hace ' + Math.floor(sol.segundos/60) + ' min';
+
+        const toast = document.createElement('div');
+        toast.id = 'solToast_' + sol.id;
+        toast.style.cssText=`
+            position:fixed; top:80px; right:24px; z-index:99999;
+            background:linear-gradient(135deg,#1e3a5f,#1e293b);
+            border:1px solid rgba(245,158,11,0.4);
+            color:white; padding:16px 20px; border-radius:16px;
+            box-shadow:0 12px 36px rgba(0,0,0,0.4);
+            max-width:360px; font-family:Inter,Arial,sans-serif;
+            animation:slideInToast .4s ease;
+            border-left:4px solid #f59e0b;
+        `;
+        toast.innerHTML=`
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+                <div style="width:42px;height:42px;border-radius:12px;
+                     background:rgba(245,158,11,0.15);display:flex;
+                     align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fa-solid fa-bell" style="color:#f59e0b;font-size:18px;"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:13px;margin-bottom:4px;">
+                        Solicitud de Permiso
+                    </div>
+                    <div style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+                        <strong style="color:#fbbf24;">${sol.solicitante}</strong>
+                        necesita autorización para:
+                        <em>${sol.accion}</em>
+                        <span style="color:#64748b;margin-left:6px;">(${hace})</span>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="generarCodigoParaSolicitud(${sol.id},'${sol.solicitante}','${sol.accion}')"
+                                style="background:#f59e0b;border:none;color:white;
+                                       padding:7px 14px;border-radius:9px;font-size:12px;
+                                       font-weight:600;cursor:pointer;flex:1;">
+                            <i class="fa-solid fa-key me-1"></i>Generar Código
+                        </button>
+                        <button onclick="descartarSolicitud(${sol.id})"
+                                style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+                                       color:#94a3b8;padding:7px 12px;border-radius:9px;
+                                       font-size:12px;cursor:pointer;">
+                            Descartar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(toast);
+        tonoSolicitud();
+
+        // Auto-cerrar en 30 segundos
+        setTimeout(()=>{
+            if(toast.parentNode){
+                toast.style.animation='slideOutToast .3s ease forwards';
+                setTimeout(()=>toast.remove(),300);
+            }
+        }, 30000);
+    }
+
+    window.generarCodigoParaSolicitud = function(solId, solicitante, accion){
+        // Marcar como atendida
+        fetch(BASE_URL+'/api/solicitar_permiso.php',{
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:`accion=atender&id=${solId}`
+        });
+        // Eliminar toast
+        const t=document.getElementById('solToast_'+solId);
+        if(t){t.style.animation='slideOutToast .3s ease forwards';setTimeout(()=>t.remove(),300);}
+        // Abrir generador de código
+        document.getElementById('gen_solicitante').value=solicitante;
+        document.getElementById('gen_descripcion').value=accion;
+        document.getElementById('codigoGenerado').style.display='none';
+        new bootstrap.Modal(document.getElementById('modalGenerarCodigo')).show();
+    };
+
+    window.descartarSolicitud = function(solId){
+        fetch(BASE_URL+'/api/solicitar_permiso.php',{
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:`accion=atender&id=${solId}`
+        });
+        const t=document.getElementById('solToast_'+solId);
+        if(t){t.style.animation='slideOutToast .3s ease forwards';setTimeout(()=>t.remove(),300);}
+    };
+
+    // Consultar solicitudes pendientes cada 8 segundos
+    function consultarSolicitudes(){
+        fetch(BASE_URL+'/api/solicitar_permiso.php?accion=pendientes')
+        .then(r=>r.json())
+        .then(data=>{
+            if(data.pendientes && data.pendientes.length>0){
+                data.pendientes.forEach(sol => mostrarAlertaSolicitud(sol));
+            }
+        })
+        .catch(()=>{});
+    }
+
+    // Iniciar polling cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded',()=>{
+        setTimeout(consultarSolicitudes, 2000);
+        intervalSolicitudes = setInterval(consultarSolicitudes, 8000);
+    });
+})();
+<?php endif; ?>
+
+// ============================================================
 // NOTIFICACIONES DE STOCK CON SONIDO
 // Se activan al cargar el dashboard si hay alertas
 // ============================================================
