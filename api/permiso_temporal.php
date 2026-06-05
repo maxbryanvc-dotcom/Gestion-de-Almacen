@@ -46,7 +46,7 @@ if ($accion === 'generar') {
         "INSERT INTO permisos_temp (codigo, solicitante, accion, recurso_id, expira_en)
          VALUES (?, ?, ?, ?, ?)"
     );
-    $stmt->bind_param('sssiss', $codigo, $solicitante, $descripcion, $recurso_id, $expira);
+    $stmt->bind_param('sssis', $codigo, $solicitante, $descripcion, $recurso_id, $expira);
 
     if ($stmt->execute()) {
         audit_log($conn, 'GENERAR_PERMISO', "Código para: $solicitante — $descripcion");
