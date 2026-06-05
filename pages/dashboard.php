@@ -483,15 +483,27 @@ function mostrarGeneradorCodigo(){
 function generarCodigo(){
     const sol  = document.getElementById('gen_solicitante').value;
     const desc = document.getElementById('gen_descripcion').value;
+    const btn  = document.querySelector('#modalGenerarCodigo .btn-warning');
+    if(btn){ btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin me-2"></i>Generando...'; }
+
     fetch(BASE_URL + '/api/permiso_temporal.php',{
         method:'POST',
         headers:{'Content-Type':'application/x-www-form-urlencoded'},
         body:`accion=generar&solicitante=${encodeURIComponent(sol)}&descripcion=${encodeURIComponent(desc)}`
-    }).then(r=>r.json()).then(data=>{
+    })
+    .then(r=>r.json())
+    .then(data=>{
+        if(btn){ btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-dice me-2"></i>Generar Código Seguro'; }
         if(data.ok){
             document.getElementById('codigoTexto').textContent = data.codigo;
             document.getElementById('codigoGenerado').style.display = 'block';
+        } else {
+            Swal.fire('Error', data.msg || 'No se pudo generar el código', 'error');
         }
+    })
+    .catch(err=>{
+        if(btn){ btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-dice me-2"></i>Generar Código Seguro'; }
+        Swal.fire('Error de conexión', 'No se pudo conectar con el servidor. Verifica que XAMPP esté corriendo.', 'error');
     });
 }
 <?php endif; ?>
