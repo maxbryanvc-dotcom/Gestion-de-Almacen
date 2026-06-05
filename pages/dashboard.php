@@ -561,13 +561,13 @@ function generarCodigo(){
                         <span style="color:#64748b;margin-left:6px;">(${hace})</span>
                     </div>
                     <div style="display:flex;gap:8px;">
-                        <button onclick="generarCodigoParaSolicitud(${sol.id},'${sol.solicitante}','${sol.accion}')"
+                        <button class="btn-gen-sol" data-id="${sol.id}"
                                 style="background:#f59e0b;border:none;color:white;
                                        padding:7px 14px;border-radius:9px;font-size:12px;
                                        font-weight:600;cursor:pointer;flex:1;">
                             <i class="fa-solid fa-key me-1"></i>Generar Código
                         </button>
-                        <button onclick="descartarSolicitud(${sol.id})"
+                        <button class="btn-des-sol" data-id="${sol.id}"
                                 style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
                                        color:#94a3b8;padding:7px 12px;border-radius:9px;
                                        font-size:12px;cursor:pointer;">
@@ -577,6 +577,15 @@ function generarCodigo(){
                 </div>
             </div>
         `;
+
+        // Usar addEventListener en lugar de onclick (evita problemas con caracteres especiales)
+        toast.querySelector('.btn-gen-sol').addEventListener('click', function(){
+            generarCodigoParaSolicitud(sol.id, sol.solicitante, sol.accion);
+        });
+        toast.querySelector('.btn-des-sol').addEventListener('click', function(){
+            descartarSolicitud(sol.id);
+        });
+
         document.body.appendChild(toast);
         tonoSolicitud();
 
